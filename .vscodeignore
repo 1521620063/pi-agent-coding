@@ -1,0 +1,17 @@
+.vscode/**
+.vscode-test/**
+.superpowers/**
+.worktrees/**
+node_modules/**
+src/**
+webview/**
+tests/**
+scripts/**
+docs/superpowers/**
+coverage/**
+artifacts/**
+*.ts
+*.mjs
+*.vsix
+dist/*.map
+package-lock.json

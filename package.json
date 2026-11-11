@@ -1,0 +1,135 @@
+{
+  "name": "pi-sidebar",
+  "displayName": "PI",
+  "description": "A native-feeling VS Code sidebar for your locally installed PI coding agent.",
+  "version": "0.1.0",
+  "publisher": "pi-extension",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/1521620063/PI-Extension.git"
+  },
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "main": "./dist/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "PI executes tools in your workspace."
+    },
+    "virtualWorkspaces": false
+  },
+  "activationEvents": [
+    "onView:pi.sidebar"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pi",
+          "title": "PI",
+          "icon": "media/pi.svg"
+        }
+      ]
+    },
+    "views": {
+      "pi": [
+        {
+          "type": "webview",
+          "id": "pi.sidebar",
+          "name": "PI"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "pi.open",
+        "title": "PI: Open Sidebar"
+      },
+      {
+        "command": "pi.attachSelection",
+        "title": "PI: Attach Selection"
+      },
+      {
+        "command": "pi.reconnect",
+        "title": "PI: Reconnect"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "pi.attachSelection",
+          "group": "navigation",
+          "when": "editorHasSelection"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "PI",
+      "properties": {
+        "pi.executablePath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the installed PI executable or official launcher.",
+          "scope": "machine"
+        },
+        "pi.nodePath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional Node.js executable used for PI JavaScript launchers.",
+          "scope": "machine"
+        },
+        "pi.requestTimeoutMs": {
+          "type": "number",
+          "default": 10000,
+          "minimum": 1000
+        },
+        "pi.startupTimeoutMs": {
+          "type": "number",
+          "default": 60000,
+          "minimum": 1000
+        },
+        "pi.shutdownTimeoutMs": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 1000
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "check": "tsc --noEmit",
+    "test": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:vscode": "node scripts/test-vscode.mjs",
+    "package": "npm run compile && vsce package --no-dependencies --allow-missing-repository",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.2.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.20.5",
+    "@types/vscode": "^1.95.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.1.0",
+    "esbuild": "^0.28.2",
+    "jsdom": "^31.0.0",
+    "mocha": "^12.0.3",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.17",
+    "markdown-it": "^15.0.3"
+  }
+}
