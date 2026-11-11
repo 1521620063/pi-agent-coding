@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from "vitest";
 import { SessionStore } from "../../src/state/session-store";
+vi.mock("../../webview/register-components", () => ({}));
 it("restores an unsent draft without replaying an already applied PI editor request", async () => {
   document.body.innerHTML = '<div id="app"></div>';
   (globalThis as any).acquireVsCodeApi = () => ({

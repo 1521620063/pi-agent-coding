@@ -19,9 +19,19 @@ export async function run(): Promise<void> {
         "pi-extension.pi-sidebar",
       );
       assert.ok(extension);
+      assert.equal(extension.packageJSON.engines.vscode, "^1.106.0");
+      assert.equal(
+        extension.packageJSON.contributes.viewsContainers.secondarySidebar[0]
+          .id,
+        "pi",
+      );
+      assert.equal(
+        extension.packageJSON.contributes.viewsContainers.activitybar,
+        undefined,
+      );
       api = await extension.activate();
     });
-    test("registers and opens the activity sidebar", async () => {
+    test("registers and opens the secondary sidebar", async () => {
       const commands = await vscode.commands.getCommands(true);
       assert.ok(commands.includes("pi.open"));
       await vscode.commands.executeCommand("pi.open");

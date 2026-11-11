@@ -4,6 +4,17 @@ import type {
   ViewState,
 } from "../src/shared/bridge";
 import { renderChat, shouldSend, element } from "./chat";
+import {
+  formButton,
+  type FormButton,
+  type FormInput,
+  type FormSelect,
+  type FormSwitch,
+  type FormTextarea,
+} from "./components";
+import { moreActions, sidebarMarkup } from "./layout";
+import type { WaSelectEvent } from "@awesome.me/webawesome/dist/events/select.js";
+import "./forms.css";
 declare function acquireVsCodeApi(): {
   postMessage(message: ClientAction): void;
   getState(): { draft?: string; editorRevision?: number } | undefined;
@@ -12,13 +23,11 @@ declare function acquireVsCodeApi(): {
 const vscode = acquireVsCodeApi();
 const post = (action: ClientAction) => vscode.postMessage(action);
 const root = document.getElementById("app")!;
-root.innerHTML = `<header><strong>π</strong><span id="title">PI</span><div class="spacer"></div><button data-action="newSession" aria-label="新建会话">＋</button><button data-action="sessions">历史</button><select id="actions" aria-label="更多操作"><option value="">⋯</option><option value="renameSession">重命名会话</option><option value="openSession">打开 PI 会话文件</option><option value="compact">压缩上下文</option><option value="fork">分叉（不回滚文件）</option><option value="clone">复制（不回滚文件）</option><option value="tree">浏览历史树</option><option value="export">导出 HTML</option><option value="settings">插件设置</option><option value="disconnect">断开</option></select></header>
-<div id="error" role="alert" hidden></div><div id="connection"></div><main id="transcript" aria-label="PI 对话" tabindex="0"></main><section id="activity" aria-live="polite"></section><div id="widgets-above"></div><section id="queue" hidden></section>
-<footer><div id="attachments"></div><div id="command-menu" hidden></div><textarea id="prompt" rows="3" aria-label="发送给 PI" placeholder="向 PI 提问… 输入 / 查看技能与命令"></textarea><div class="input-actions"><button data-action="attachFiles">＋ 附件</button><button data-action="attachSelection">选区</button><div class="spacer"></div><select id="mode" aria-label="运行时发送方式"><option value="followUp">后续消息</option><option value="steer">补充指示</option></select><button id="send" class="primary">发送 ↵</button><button data-action="stop" id="stop" hidden>停止全部</button></div><div class="statusline"><button data-action="chooseModel" id="model">模型</button><button data-action="chooseThinking" id="thinking">思考</button><span id="usage"></span></div><div class="statusline"><span id="cwd"></span><span id="statuses"></span></div><details class="preferences"><summary>上下文与重试</summary><label><input type="checkbox" id="auto-compaction">自动压缩</label><label><input type="checkbox" id="auto-retry">自动重试<span id="retry-known"></span></label><button data-action="compact">手动压缩</button></details></footer><div id="widgets-below"></div>
-<details id="shell-panel"><summary>PI 命令</summary><p class="muted">由 PI 执行；默认输出在下一次请求时加入上下文。</p><input id="shell-command" aria-label="PI shell 命令" placeholder="输入命令"><label><input type="checkbox" id="shell-exclude">不加入上下文</label><button id="run-shell">运行</button><button data-action="cancelShell">取消命令</button><pre id="shell-output"></pre></details>`;
+root.innerHTML = sidebarMarkup;
 const byId = <T extends HTMLElement = HTMLElement>(id: string) =>
   document.getElementById(id) as T;
-const prompt = byId<HTMLTextAreaElement>("prompt");
+const prompt = byId<FormTextarea>("prompt");
+const promptText = () => prompt.value ?? "";
 const restored = vscode.getState();
 prompt.value = restored?.draft ?? "";
 let state: ViewState | undefined;
@@ -26,13 +35,15 @@ let submitting = false;
 let submittedText = "";
 let editorRevision = restored?.editorRevision ?? 0;
 let composing = false;
-for (const button of root.querySelectorAll<HTMLButtonElement>("[data-action]"))
+for (const button of root.querySelectorAll<FormButton>("[data-action]"))
   button.onclick = () => post({ type: button.dataset.action } as ClientAction);
-byId<HTMLSelectElement>("actions").onchange = (event) => {
-  const select = event.target as HTMLSelectElement;
-  if (select.value) post({ type: select.value } as ClientAction);
-  select.value = "";
-};
+byId("actions").addEventListener("wa-select", (event) => {
+  const item = (event as WaSelectEvent).detail.item;
+  const action = moreActions.find(
+    ([type]) => type === item.getAttribute("value"),
+  );
+  if (action) post({ type: action[0] });
+});
 byId("send").onclick = send;
 prompt.addEventListener("compositionstart", () => {
   composing = true;
@@ -53,53 +64,63 @@ prompt.addEventListener("keydown", (event) => {
   }
 });
 prompt.addEventListener("input", () => {
-  vscode.setState({ draft: prompt.value, editorRevision });
+  vscode.setState({ draft: promptText(), editorRevision });
   renderCommands();
 });
-byId<HTMLInputElement>("auto-compaction").onchange = (event) =>
+byId<FormSwitch>("auto-compaction").onchange = () =>
   post({
     type: "autoCompaction",
-    enabled: (event.target as HTMLInputElement).checked,
+    enabled: byId<FormSwitch>("auto-compaction").checked,
   });
-byId<HTMLInputElement>("auto-retry").onchange = (event) =>
+byId<FormSwitch>("auto-retry").onchange = () =>
   post({
     type: "autoRetry",
-    enabled: (event.target as HTMLInputElement).checked,
+    enabled: byId<FormSwitch>("auto-retry").checked,
   });
-byId("run-shell").onclick = () =>
+byId<FormInput>("shell-command").addEventListener("input", updateShellControls);
+byId("run-shell").onclick = () => {
+  if (byId<FormButton>("run-shell").disabled) return;
   post({
     type: "shell",
-    command: byId<HTMLInputElement>("shell-command").value,
-    excludeFromContext: byId<HTMLInputElement>("shell-exclude").checked,
+    command: byId<FormInput>("shell-command").value ?? "",
+    excludeFromContext: byId<FormSwitch>("shell-exclude").checked,
   });
+};
+function updateShellControls() {
+  byId<FormButton>("run-shell").disabled =
+    state?.connection !== "connected" ||
+    !!state.shell?.active ||
+    !byId<FormInput>("shell-command").value?.trim();
+  byId("cancel-shell").hidden = !state?.shell?.active;
+}
 function send() {
   if (
     !state ||
     state.connection !== "connected" ||
     submitting ||
     composing ||
-    (!prompt.value.trim() && !state.attachments.length)
+    (!promptText().trim() && !state.attachments.length)
   )
     return;
-  submittedText = prompt.value;
+  submittedText = promptText();
   submitting = true;
   updateSend();
   post({
     type: "send",
     text: submittedText,
     attachmentIds: state.attachments.map((a) => a.id),
-    mode: byId<HTMLSelectElement>("mode").value as "steer" | "followUp",
+    mode: byId<FormSelect>("mode").value === "steer" ? "steer" : "followUp",
   });
 }
 function updateSend() {
-  byId<HTMLButtonElement>("send").disabled =
+  byId<FormButton>("send").disabled =
     submitting || state?.connection !== "connected";
 }
 window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
   if (data.type === "sent") {
     submitting = false;
-    if (prompt.value === submittedText) prompt.value = "";
-    vscode.setState({ draft: prompt.value, editorRevision });
+    if (promptText() === submittedText) prompt.value = "";
+    vscode.setState({ draft: promptText(), editorRevision });
     renderCommands();
     updateSend();
     return;
@@ -112,15 +133,16 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
   if (state.editorText && state.editorText.revision !== editorRevision) {
     editorRevision = state.editorText.revision;
     prompt.value = state.editorText.append
-      ? [prompt.value, state.editorText.text].filter(Boolean).join("\n\n")
+      ? [promptText(), state.editorText.text].filter(Boolean).join("\n\n")
       : state.editorText.text;
-    vscode.setState({ draft: prompt.value, editorRevision });
+    vscode.setState({ draft: promptText(), editorRevision });
     renderCommands();
   }
 });
 function renderState() {
   if (!state) return;
   updateSend();
+  updateShellControls();
   byId("title").textContent = state.title ?? state.session?.name ?? "PI";
   const error = byId("error");
   error.hidden = !state.error;
@@ -137,20 +159,23 @@ function renderState() {
           : "本机 PI 尚未连接",
       ),
     );
-    const button = element(
-      "button",
-      "",
+    const button = formButton(
       state.connection === "error" ? "重新连接" : "连接 PI",
     );
+    button.appearance = "outlined";
     button.disabled = state.connection === "connecting";
     button.onclick = () => post({ type: "connect" });
     connection.append(button);
   }
   connection.hidden = state.connection === "connected";
   byId("stop").hidden = state.run === "idle" && !state.compaction.active;
-  byId("model").textContent =
+  byId("run-controls").hidden = byId("stop").hidden;
+  byId("model-name").textContent =
     state.model?.name ?? state.model?.id ?? "选择模型";
-  byId("thinking").textContent = state.thinkingLevel ?? "思考";
+  byId("thinking-name").textContent = state.thinkingLevel ?? "思考";
+  for (const id of ["model", "thinking", "auto-compaction", "auto-retry"])
+    byId<FormButton | FormSwitch>(id).disabled =
+      state.connection !== "connected";
   byId("cwd").textContent = state.workspace ?? "打开本地工作区后连接";
   byId("cwd").title = state.workspace ?? "";
   byId("statuses").textContent = Object.values(state.statuses).join(" · ");
@@ -170,9 +195,8 @@ function renderState() {
   ]
     .filter(Boolean)
     .join(" · ");
-  byId<HTMLInputElement>("auto-compaction").checked =
-    !!state.compaction.enabled;
-  byId<HTMLInputElement>("auto-retry").checked = !!state.retry.enabled;
+  byId<FormSwitch>("auto-compaction").checked = !!state.compaction.enabled;
+  byId<FormSwitch>("auto-retry").checked = !!state.retry.enabled;
   byId("retry-known").textContent =
     state.retry.enabled === undefined ? "（当前设置未知）" : "";
   const activity = byId("activity");
@@ -185,7 +209,7 @@ function renderState() {
         `正在重试 ${state.retry.attempt ?? ""} · ${state.retry.errorMessage ?? ""}`,
       ),
     );
-    const cancel = element("button", "", "取消重试");
+    const cancel = formButton("取消重试");
     cancel.onclick = () => post({ type: "cancelRetry" });
     activity.append(cancel);
   } else if (state.compaction.active)
@@ -214,7 +238,7 @@ function renderState() {
     chip.append(
       element("span", "", item.kind === "image" ? `▧ ${item.name}` : item.name),
     );
-    const remove = element("button", "", "×");
+    const remove = formButton("×");
     remove.setAttribute("aria-label", `移除 ${item.name}`);
     remove.onclick = () => post({ type: "removeAttachment", id: item.id });
     chip.append(remove);
@@ -241,7 +265,7 @@ function renderState() {
       );
   if (!queue.hidden) {
     queue.append(element("small", "muted", "补充指示在当前工具完成后处理。"));
-    const clear = element("button", "", "清空并恢复到输入框");
+    const clear = formButton("清空并恢复到输入框");
     clear.onclick = () => post({ type: "clearQueue" });
     queue.append(clear);
   }
@@ -271,7 +295,7 @@ function renderState() {
 function renderCommands() {
   const menu = byId("command-menu");
   menu.replaceChildren();
-  const match = prompt.value.match(/^\/([^\s]*)$/);
+  const match = promptText().match(/^\/([^\s]*)$/);
   menu.hidden = !match;
   if (!match) return;
   const commands =
@@ -281,14 +305,13 @@ function renderCommands() {
   if (!commands.length)
     menu.append(element("div", "muted", "没有可发现的 PI 命令"));
   for (const cmd of commands.slice(0, 30)) {
-    const button = element(
-      "button",
-      "command-option",
+    const button = formButton(
       `/${cmd.name} · ${cmd.description ?? cmd.source}`,
+      "command-option",
     );
     button.onclick = () => {
       prompt.value = `/${cmd.name} `;
-      vscode.setState({ draft: prompt.value, editorRevision });
+      vscode.setState({ draft: promptText(), editorRevision });
       menu.hidden = true;
       prompt.focus();
     };

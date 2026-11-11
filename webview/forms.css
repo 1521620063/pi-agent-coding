@@ -1,0 +1,379 @@
+/* Web Awesome controls share PI's density and VS Code's theme. */
+wa-button,
+wa-input,
+wa-select,
+wa-switch,
+wa-textarea,
+wa-dropdown {
+  font-family: var(--vscode-font-family, system-ui);
+  min-width: 0;
+}
+wa-button::part(base) {
+  font-size: var(--pi-font-small);
+  min-height: 30px;
+  border-radius: 6px;
+  transition:
+    background-color 120ms,
+    border-color 120ms;
+}
+wa-button[appearance="plain"]::part(base) {
+  color: var(--pi-muted);
+}
+wa-button[appearance="plain"]:hover::part(base) {
+  color: var(--pi-fg);
+  background: var(--pi-hover);
+}
+wa-button[variant="danger"]::part(base) {
+  color: var(--pi-tool-error);
+}
+wa-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+header {
+  gap: 3px;
+  padding: 8px 12px 8px 16px;
+}
+header #title {
+  margin-left: 4px;
+}
+header wa-button::part(base) {
+  padding-inline: 8px;
+}
+header wa-button[aria-label]::part(base) {
+  width: 30px;
+  padding: 0;
+}
+wa-dropdown::part(menu) {
+  padding: 5px;
+  border: 1px solid var(--pi-line);
+  border-radius: 9px;
+  box-shadow: var(--pi-popup-shadow);
+  max-width: calc(100vw - 24px);
+}
+wa-dropdown-item::part(label) {
+  font-size: var(--pi-font-small);
+}
+footer {
+  flex-shrink: 0;
+  padding: 8px 12px 4px;
+}
+.composer {
+  padding: 0;
+  border-radius: 12px;
+  overflow: visible;
+  box-shadow: none;
+}
+.composer:focus-within {
+  border-color: var(--pi-focus);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pi-focus) 12%, transparent);
+}
+#prompt {
+  display: block;
+  width: 100%;
+  --wa-form-control-background-color: transparent;
+  --wa-form-control-border-width: 0;
+  --wa-focus-ring-width: 0;
+}
+#prompt::part(textarea-wrapper) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 12px 12px 0 0;
+}
+#prompt::part(textarea) {
+  padding: 14px 14px 8px;
+  min-height: 92px;
+  max-height: 26vh;
+  font-size: var(--pi-font-content);
+  line-height: 1.65;
+  outline: none;
+}
+.input-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 5px 9px 9px;
+}
+.input-actions::after {
+  display: none;
+}
+.attach-actions,
+.send-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.input-actions wa-button::part(base) {
+  padding-inline: 7px;
+}
+#mode {
+  width: 108px;
+  --wa-form-control-background-color: transparent;
+  --wa-form-control-border-color: transparent;
+  --wa-form-control-padding-inline: 7px;
+  --wa-form-control-height: 30px;
+  --wa-form-control-value-color: var(--pi-muted);
+}
+#mode::part(combobox) {
+  box-shadow: none;
+}
+#mode:hover::part(combobox) {
+  background: var(--pi-hover);
+}
+#mode::part(display-input) {
+  font-size: var(--pi-font-small);
+}
+#mode::part(listbox) {
+  padding: 5px;
+  border-radius: 8px;
+  border-color: var(--pi-line);
+  box-shadow: var(--pi-popup-shadow);
+}
+wa-option::part(label) {
+  font-size: var(--pi-font-small);
+}
+#send::part(base) {
+  width: 31px;
+  min-height: 31px;
+  padding: 0;
+  border-radius: 9px;
+  color: var(--pi-button-text);
+  background: var(--pi-button);
+  border-color: transparent;
+}
+#send:hover::part(base) {
+  background: var(--vscode-button-hoverBackground, var(--pi-accent));
+}
+.composer-meta {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 10px;
+  padding: 5px 0;
+  border-top: 1px solid var(--pi-line);
+}
+.composer-meta wa-button {
+  min-width: 0;
+}
+.composer-meta wa-button::part(base) {
+  min-height: 27px;
+  padding-inline: 5px;
+  font-size: var(--pi-font-compact);
+  gap: 5px;
+}
+.composer-meta wa-button::part(label) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composer-meta wa-icon {
+  font-size: 9px;
+  opacity: 0.7;
+}
+#model {
+  max-width: 70%;
+}
+#model::part(base) {
+  color: var(--pi-fg);
+}
+#thinking {
+  flex-shrink: 0;
+}
+.statusline {
+  gap: 3px 8px;
+  font-size: var(--pi-font-compact);
+  padding-inline: 3px;
+}
+.composer-hint {
+  margin-top: 7px;
+}
+.composer-hint > span:first-child {
+  opacity: 0.85;
+}
+#usage {
+  margin-left: auto;
+}
+.workspace-status {
+  margin-top: 3px;
+}
+#run-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--pi-font-compact);
+  padding: 0 3px 8px;
+}
+#stop::part(base) {
+  min-height: 26px;
+  font-size: var(--pi-font-compact);
+  padding: 0 8px;
+}
+.preferences,
+#shell-panel {
+  font-size: var(--pi-font-small);
+}
+.preferences {
+  padding: 6px 3px 0;
+  margin-top: 1px;
+  max-height: 32vh;
+  overflow: auto;
+}
+.settings-fields,
+.shell-fields {
+  display: grid;
+  gap: 15px;
+  padding: 12px;
+  border: 1px solid var(--pi-line);
+  border-radius: 9px;
+  background: var(--pi-soft);
+  margin: 7px 0 3px;
+}
+wa-switch {
+  font-size: var(--pi-font-small);
+  --width: 28px;
+  --height: 16px;
+  --thumb-size: 12px;
+}
+wa-switch::part(label) {
+  font-weight: 500;
+}
+wa-switch::part(hint) {
+  font-size: var(--pi-font-compact);
+  line-height: 1.6;
+  color: var(--pi-muted);
+}
+.settings-action {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--pi-line);
+  font-size: var(--pi-font-compact);
+}
+#shell-panel {
+  flex-shrink: 0;
+  max-height: 42vh;
+  padding: 6px 15px 10px;
+}
+.shell-fields {
+  margin-bottom: 0;
+}
+#shell-command {
+  width: 100%;
+}
+#shell-command::part(input) {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--pi-font-small);
+}
+#shell-command::part(hint) {
+  font-size: var(--pi-font-compact);
+  line-height: 1.6;
+}
+.shell-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+#shell-output {
+  margin: 0;
+  font-size: var(--pi-font-small);
+  border-radius: 5px;
+}
+#shell-output:empty {
+  display: none;
+}
+#connection wa-button {
+  margin-left: auto;
+}
+#activity wa-button::part(base),
+#queue wa-button::part(base) {
+  min-height: 26px;
+  padding: 0 6px;
+}
+.attachment wa-button::part(base) {
+  min-height: 23px;
+  padding: 0 5px;
+}
+wa-button.command-option::part(base) {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 7px 8px;
+  height: auto;
+}
+wa-button.command-option::part(label) {
+  white-space: normal;
+  text-align: left;
+}
+@media (max-width: 350px) {
+  header {
+    padding-inline: 12px 8px;
+  }
+  footer {
+    padding-inline: 8px;
+  }
+  .input-actions {
+    gap: 2px;
+    padding-inline: 5px;
+  }
+  .input-actions wa-button::part(base) {
+    padding-inline: 5px;
+  }
+  #mode {
+    width: 99px;
+    --wa-form-control-padding-inline: 4px;
+  }
+  #usage {
+    width: 100%;
+    margin: 0;
+  }
+  .settings-fields,
+  .shell-fields {
+    padding: 10px;
+  }
+  #shell-panel {
+    padding-inline: 11px;
+  }
+}
+@media (max-width: 270px) {
+  .input-actions {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .send-actions {
+    margin-left: auto;
+  }
+  .composer-meta {
+    flex-wrap: wrap;
+  }
+  #model {
+    max-width: 100%;
+  }
+}
+@media (max-height: 600px) {
+  #prompt::part(textarea) {
+    min-height: 56px;
+    padding-top: 10px;
+  }
+  .composer-hint > span:first-child,
+  .workspace-status {
+    display: none;
+  }
+  .composer-hint {
+    margin-top: 4px;
+  }
+  #shell-panel {
+    padding-bottom: 6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  wa-button::part(base) {
+    transition: none;
+  }
+}

@@ -30,7 +30,7 @@ export function createSidebarProvider(
           vscode.Uri.joinPath(extensionUri, "dist", file),
         );
       const nonce = randomBytes(18).toString("base64");
-      current.webview.html = `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${current.webview.cspSource} data:; style-src ${current.webview.cspSource}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${uri("theme.css")}"><link rel="stylesheet" href="${uri("styles.css")}"><title>PI</title></head><body><div id="app"></div><script nonce="${nonce}" src="${uri("webview.js")}"></script></body></html>`;
+      current.webview.html = `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${current.webview.cspSource} data:; style-src ${current.webview.cspSource}; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${uri("theme.css")}"><link rel="stylesheet" href="${uri("styles.css")}"><link rel="stylesheet" href="${uri("webview.css")}"><title>PI</title></head><body><div id="app"></div><script nonce="${nonce}" src="${uri("webview.js")}"></script></body></html>`;
       disposables.push(
         current.webview.onDidReceiveMessage(async (value) => {
           const action = parseClientAction(value);

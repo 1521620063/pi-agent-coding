@@ -5,18 +5,15 @@ body {
   margin: 0;
   background: var(--pi-bg);
   color: var(--pi-fg);
-  font: var(--vscode-font-size, 13px)/1.55 var(--vscode-font-family, system-ui);
+  font: var(--pi-font-size)/1.55 var(--vscode-font-family, system-ui);
 }
 #app {
-  height: 100vh;
   display: flex;
   flex-direction: column;
 }
 header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
   border-bottom: 1px solid var(--pi-border);
 }
 header strong {
@@ -26,11 +23,6 @@ header strong {
 main {
   flex: 1;
   overflow: auto;
-  padding: 12px;
-}
-footer {
-  padding: 10px 12px;
-  border-top: 1px solid var(--pi-border);
 }
 button {
   color: var(--pi-fg);
@@ -40,9 +32,6 @@ button {
   cursor: pointer;
   font: inherit;
 }
-button:hover {
-  background: var(--vscode-toolbar-hoverBackground);
-}
 button:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
@@ -50,7 +39,7 @@ select:focus-visible {
   outline-offset: 2px;
 }
 #status {
-  font-size: 11px;
+  font-size: var(--pi-font-small);
   color: var(--pi-muted);
 }
 [hidden] {
@@ -67,7 +56,6 @@ header #title {
   max-width: 52%;
 }
 header select {
-  width: 32px;
   flex-shrink: 0;
 }
 header button {
@@ -92,22 +80,14 @@ select {
 textarea {
   display: block;
   width: 100%;
-  resize: vertical;
-  min-height: 66px;
-  max-height: 30vh;
-  border: 0;
   border-top: 1px solid var(--pi-accent);
-  padding: 10px 2px;
-  background: transparent;
   line-height: 1.6;
 }
 main {
-  min-height: 65px;
   scrollbar-gutter: stable;
   overflow-wrap: anywhere;
 }
 #connection {
-  padding: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -119,17 +99,15 @@ main {
   overflow: auto;
   border-left: 2px solid var(--pi-tool-error);
   color: var(--pi-tool-error);
-  padding: 8px 12px;
 }
 .input-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
   flex-wrap: wrap;
 }
 .input-actions button,
 .statusline button {
-  font-size: 11px;
+  font-size: var(--pi-font-small);
   border: 0;
   padding: 3px 4px;
 }
@@ -143,10 +121,7 @@ button:disabled {
 .statusline {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px 8px;
   color: var(--pi-muted);
-  font-size: 11px;
-  margin-top: 5px;
   align-items: center;
 }
 .statusline button {
@@ -162,9 +137,7 @@ button:disabled {
   font-family: var(--vscode-editor-font-family, monospace);
 }
 .preferences {
-  font-size: 11px;
   color: var(--pi-muted);
-  margin-top: 4px;
 }
 .preferences label {
   display: inline-flex;
@@ -175,41 +148,21 @@ button:disabled {
   cursor: pointer;
 }
 .empty {
-  padding: 15vh 4px 24px;
   color: var(--pi-muted);
 }
 .empty .pi-mark {
   font: 40px Georgia;
   color: var(--pi-accent);
-  margin-bottom: 16px;
 }
 .empty h1 {
-  font-size: 16px;
-  font-weight: 500;
   color: var(--pi-fg);
   margin: 0;
-}
-.empty p {
-  font-size: 12px;
-  max-width: 250px;
-}
-.user-message {
-  background: color-mix(in srgb, var(--pi-accent) 8%, var(--pi-bg));
-  border-left: 2px solid var(--pi-accent);
-  padding: 8px 10px;
-  margin: 10px 0 14px;
-}
-.assistant-message {
-  margin: 8px 0 18px;
 }
 .markdown > :first-child {
   margin-top: 0;
 }
 .markdown > :last-child {
   margin-bottom: 0;
-}
-.markdown p {
-  margin: 8px 0;
 }
 .markdown h1,
 .markdown h2,
@@ -224,7 +177,7 @@ button:disabled {
 pre,
 code {
   font-family: var(--vscode-editor-font-family, monospace);
-  font-size: var(--vscode-editor-font-size, 12px);
+  font-size: var(--pi-font-code);
 }
 pre {
   overflow: auto;
@@ -250,32 +203,23 @@ pre {
 }
 .thinking {
   color: var(--pi-thinking);
-  font-size: 12px;
-  margin: 6px 0;
 }
 .thinking-text {
   white-space: pre-wrap;
-  padding: 6px 0;
 }
 .tool {
   border-left: 2px solid var(--pi-tool-pending);
-  background: var(--vscode-textCodeBlock-background);
-  padding: 5px 8px;
-  margin: 8px 0;
-  font-size: 12px;
+  font-size: var(--pi-font-content);
 }
 .tool.success {
-  border-color: var(--pi-tool-success);
+  border-color: var(--pi-line);
 }
 .tool.error {
-  border-color: var(--pi-tool-error);
+  border-color: var(--pi-line);
 }
 .tool summary {
   cursor: pointer;
   overflow-wrap: anywhere;
-}
-.tool.success > summary {
-  color: var(--pi-tool-success);
 }
 .tool.error > summary,
 .error {
@@ -300,7 +244,7 @@ pre {
 }
 #activity,
 #queue {
-  font-size: 11px;
+  font-size: var(--pi-font-small);
   padding: 0 12px;
   max-height: 130px;
   overflow: auto;
@@ -310,7 +254,7 @@ pre {
 }
 #activity button,
 #queue button {
-  font-size: 11px;
+  font-size: var(--pi-font-small);
   padding: 2px 4px;
   margin: 4px;
 }
@@ -325,7 +269,6 @@ pre {
 #attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
 }
 .attachment {
   display: inline-flex;
@@ -333,7 +276,7 @@ pre {
   gap: 4px;
   border: 1px solid var(--pi-border);
   max-width: 100%;
-  font-size: 11px;
+  font-size: var(--pi-font-small);
 }
 .attachment span {
   overflow: hidden;
@@ -343,13 +286,12 @@ pre {
 }
 .attachment button {
   border: 0;
-  font-size: 12px;
+  font-size: var(--pi-font-content);
   padding: 1px 5px;
 }
 #command-menu {
   max-height: 200px;
   overflow: auto;
-  padding: 6px 0;
   border-bottom: 1px solid var(--pi-border);
 }
 .command-option {
@@ -357,10 +299,10 @@ pre {
   width: 100%;
   text-align: left;
   border: 0;
-  font-size: 12px;
+  font-size: var(--pi-font-content);
 }
 .widget {
-  font-size: 11px;
+  font-size: var(--pi-font-small);
   margin: 0;
   padding: 5px 12px;
   color: var(--pi-muted);
@@ -368,9 +310,7 @@ pre {
   overflow: auto;
 }
 #shell-panel {
-  font-size: 11px;
   border-top: 1px solid var(--pi-border);
-  padding: 5px 12px;
   max-height: 35vh;
   overflow: auto;
 }
@@ -382,7 +322,6 @@ pre {
 }
 #shell-panel input:not([type="checkbox"]) {
   width: 100%;
-  padding: 5px;
 }
 #shell-output {
   max-height: 160px;
@@ -413,5 +352,545 @@ pre {
   }
   .input-actions select {
     max-width: 100px;
+  }
+}
+
+/* PI sidebar: quiet chrome, readable transcript, a single composed editor. */
+:root {
+  --pi-radius: 8px;
+}
+body {
+  -webkit-font-smoothing: antialiased;
+}
+#app {
+  height: 100dvh;
+  min-width: 0;
+}
+header {
+  min-height: 48px;
+  padding: 8px 16px;
+  gap: 8px;
+  border-bottom-color: var(--pi-line);
+}
+header strong {
+  font-size: 26px;
+  line-height: 1;
+  margin-right: 3px;
+}
+header #title {
+  font-weight: 600;
+  font-size: var(--pi-font-content);
+  letter-spacing: 0.1px;
+}
+button,
+select,
+input {
+  border-radius: 5px;
+}
+button {
+  transition:
+    background-color 120ms,
+    color 120ms;
+}
+button:hover {
+  background: var(--pi-hover);
+}
+button:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--pi-focus);
+  outline-offset: 2px;
+}
+header button,
+header select {
+  min-height: 28px;
+  color: var(--pi-muted);
+  background: transparent;
+}
+header button {
+  padding: 4px 8px;
+}
+header select {
+  padding: 3px;
+  width: 34px;
+  cursor: pointer;
+}
+select option {
+  background: var(--pi-surface);
+  color: var(--pi-fg);
+}
+main {
+  padding: 20px 18px 28px;
+  min-height: 55px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--pi-line) transparent;
+}
+.user-message {
+  margin: 4px 0 24px;
+  padding: 12px 14px;
+  border: 0;
+  border: 1px solid color-mix(in srgb, var(--pi-accent) 13%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--pi-accent) 6%, var(--pi-bg));
+}
+.assistant-message {
+  margin: 0 0 25px;
+  line-height: 1.7;
+}
+.markdown p {
+  margin: 10px 0;
+}
+.markdown li {
+  margin: 4px 0;
+}
+.markdown ul,
+.markdown ol {
+  padding-left: 23px;
+}
+.markdown blockquote {
+  margin: 12px 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--pi-line);
+  color: var(--pi-muted);
+}
+.markdown :not(pre) > code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--pi-soft);
+  font-size: 0.92em;
+}
+.markdown pre {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--pi-line);
+  border-radius: var(--pi-radius);
+  background: var(--pi-soft);
+  line-height: 1.65;
+}
+.thinking {
+  margin: 0 0 12px;
+  font-size: var(--pi-font-small);
+}
+.thinking summary {
+  cursor: pointer;
+  padding: 3px 0;
+}
+.thinking-text {
+  padding: 8px 12px;
+  margin-top: 5px;
+  border-left: 1px solid var(--pi-line);
+  line-height: 1.65;
+}
+.tool {
+  padding: 0;
+  margin: 6px 0;
+  border: 1px solid var(--pi-line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--pi-fg) 2%, var(--pi-bg));
+}
+.tool > summary {
+  padding: 8px 11px;
+  line-height: 1.5;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--pi-font-small);
+}
+.tool.success > summary {
+  color: var(--pi-fg);
+}
+.tool.success > summary::marker {
+  color: var(--pi-tool-success);
+}
+.tool.pending > summary {
+  color: var(--pi-muted);
+}
+.tool > pre,
+.tool > div,
+.tool > small {
+  margin-left: 11px;
+  margin-right: 11px;
+}
+.tool > pre {
+  padding: 8px 0;
+  background: transparent;
+  font-size: var(--pi-font-small);
+}
+.tool > small {
+  display: block;
+  padding: 0 0 9px;
+}
+.tool[open] > summary {
+  border-bottom: 1px solid var(--pi-line);
+}
+footer {
+  padding: 10px 12px 6px;
+  border-top: 0;
+}
+.composer {
+  border: 1px solid var(--pi-line);
+  background: var(--pi-surface);
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--pi-bg) 25%, transparent);
+  transition:
+    border-color 120ms,
+    box-shadow 120ms;
+}
+.composer:focus-within {
+  border-color: var(--pi-focus);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pi-focus) 15%, transparent);
+}
+textarea {
+  padding: 11px 10px 8px;
+  min-height: 76px;
+  border: 0;
+  resize: vertical;
+  max-height: 26vh;
+  font-size: var(--pi-font-content);
+  background: transparent;
+}
+textarea:focus-visible {
+  outline: none;
+}
+textarea::placeholder {
+  color: var(--pi-muted);
+  opacity: 0.8;
+}
+.input-actions {
+  padding: 4px;
+  gap: 4px;
+}
+.input-actions button {
+  min-height: 27px;
+  padding: 4px 7px;
+  border-radius: 5px;
+  color: var(--pi-muted);
+}
+.input-actions select {
+  background: transparent;
+  color: var(--pi-muted);
+  font-size: var(--pi-font-compact);
+  padding: 4px 2px;
+  border-color: transparent;
+  cursor: pointer;
+  max-width: 98px;
+}
+.input-actions #send {
+  color: var(--pi-button-text);
+  background: var(--pi-button);
+  padding: 4px 10px;
+  font-weight: 600;
+}
+.input-actions #send:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.input-actions #stop {
+  color: var(--pi-tool-error);
+  border: 1px solid var(--pi-line);
+}
+.statusline {
+  margin-top: 6px;
+  gap: 3px 6px;
+  font-size: var(--pi-font-small);
+  line-height: 1.5;
+}
+.statusline button {
+  padding: 3px 5px;
+  border-radius: 4px;
+  font-size: var(--pi-font-compact);
+}
+#model {
+  max-width: 65%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pi-fg);
+}
+#thinking {
+  color: var(--pi-muted);
+}
+#usage {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+#cwd {
+  font-size: var(--pi-font-compact);
+  opacity: 0.8;
+}
+.preferences {
+  padding: 4px 4px 0;
+  margin-top: 4px;
+  border-top: 0;
+  font-size: var(--pi-font-compact);
+}
+.preferences summary {
+  padding: 2px 0;
+}
+.preferences[open] summary {
+  margin-bottom: 6px;
+}
+.preferences label {
+  padding: 4px 0;
+}
+input[type="checkbox"] {
+  accent-color: var(--pi-accent);
+  vertical-align: middle;
+}
+#shell-panel {
+  padding: 6px 16px 9px;
+  border-top: 0;
+  font-size: var(--pi-font-compact);
+  color: var(--pi-muted);
+}
+#shell-panel[open] summary {
+  margin-bottom: 9px;
+}
+#shell-panel input:not([type="checkbox"]) {
+  margin: 6px 0 9px;
+  padding: 8px;
+  font-size: var(--pi-font-content);
+}
+#shell-panel button {
+  margin: 6px 3px;
+  font-size: var(--pi-font-small);
+}
+#connection {
+  margin: 10px 12px 0;
+  padding: 11px 12px;
+  border: 1px solid var(--pi-line);
+  border-radius: 8px;
+  background: var(--pi-soft);
+  font-size: var(--pi-font-small);
+}
+#connection button {
+  margin-left: auto;
+  font-size: var(--pi-font-small);
+  border-color: var(--pi-line);
+}
+#error {
+  margin: 10px 12px 0;
+  padding: 10px 12px;
+  border-radius: 5px;
+  font-size: var(--pi-font-small);
+  background: color-mix(in srgb, var(--pi-tool-error) 6%, var(--pi-bg));
+}
+#activity {
+  padding: 5px 18px;
+  font-size: var(--pi-font-compact);
+  color: var(--pi-muted);
+}
+.working {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.working::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--pi-accent);
+}
+#queue {
+  margin: 5px 12px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: var(--pi-soft);
+}
+#attachments {
+  padding: 0 6px;
+  gap: 5px;
+}
+#attachments:not(:empty) {
+  padding-top: 7px;
+}
+.attachment {
+  border-color: var(--pi-line);
+  border-radius: 5px;
+  background: var(--pi-soft);
+}
+#command-menu {
+  margin: 4px;
+  padding: 4px;
+  border: 1px solid var(--pi-line);
+  border-radius: 6px;
+}
+.command-option {
+  padding: 7px 8px;
+}
+.empty {
+  padding: 24px 12px 48px;
+  text-align: center;
+  max-width: 320px;
+  margin: auto;
+}
+.empty .pi-mark {
+  font-size: 54px;
+  line-height: 1;
+  margin-bottom: 24px;
+  opacity: 0.85;
+}
+.empty h1 {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+  line-height: 1.5;
+}
+.empty p {
+  line-height: 1.8;
+  font-size: var(--pi-font-content);
+  margin: 12px auto 0;
+  max-width: 245px;
+}
+.vscode-high-contrast .composer,
+.vscode-high-contrast-light .composer,
+.vscode-high-contrast .tool,
+.vscode-high-contrast-light .tool {
+  border: 1px solid var(--pi-border);
+}
+@media (max-width: 350px) {
+  header {
+    padding: 9px 12px;
+    gap: 4px;
+    min-height: 48px;
+  }
+  header #title {
+    max-width: 42%;
+  }
+  main {
+    padding: 14px 12px;
+  }
+  footer {
+    padding: 8px;
+  }
+  .input-actions {
+    gap: 1px;
+    padding: 4px 2px;
+  }
+  .input-actions button {
+    padding: 4px 5px;
+    font-size: var(--pi-font-compact);
+  }
+  .input-actions select {
+    max-width: 84px;
+  }
+  .input-actions #send {
+    padding: 4px 7px;
+  }
+  #usage {
+    width: 100%;
+    margin: 2px 5px 0;
+  }
+  .empty {
+    padding-left: 5px;
+  }
+  .empty h1 {
+    font-size: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+@media (max-height: 600px) {
+  textarea {
+    min-height: 56px;
+    height: 56px;
+  }
+  .statusline {
+    margin-top: 3px;
+  }
+  .statusline:has(#cwd) {
+    display: none;
+  }
+  #shell-panel {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  footer {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+}
+
+/* Keep the empty state balanced and the composer controls on predictable rows. */
+main:has(> .empty:only-child) {
+  display: grid;
+  align-content: center;
+}
+header strong {
+  flex-shrink: 0;
+}
+header button:hover,
+header select:hover {
+  color: var(--pi-fg);
+  background: var(--pi-hover);
+}
+.input-actions .spacer {
+  min-width: 0;
+}
+.input-actions #stop {
+  order: 5;
+  margin-left: auto;
+  padding: 3px 7px;
+  min-height: 24px;
+  font-size: var(--pi-font-compact);
+}
+.input-actions:has(#stop:not([hidden]))::after {
+  content: "";
+  flex-basis: 100%;
+  order: 4;
+  height: 0;
+}
+.input-actions #send {
+  border-radius: 7px;
+}
+.tool > summary:hover {
+  background: var(--pi-hover);
+  border-radius: 6px;
+}
+.thinking summary::marker {
+  color: var(--pi-muted);
+}
+.preferences summary,
+#shell-panel summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.preferences summary::before,
+#shell-panel summary::before {
+  content: "\203a";
+  font-size: 14px;
+  line-height: 1;
+  transition: transform 120ms;
+}
+.preferences[open] summary::before,
+#shell-panel[open] summary::before {
+  transform: rotate(90deg);
+}
+.preferences summary:hover,
+#shell-panel summary:hover {
+  color: var(--pi-fg);
+}
+@media (max-height: 600px) {
+  .empty {
+    padding: 12px 4px;
+  }
+  .empty .pi-mark {
+    font-size: 34px;
+    margin-bottom: 12px;
+  }
+  .empty p {
+    margin-top: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .preferences summary::before,
+  #shell-panel summary::before {
+    transition: none;
   }
 }

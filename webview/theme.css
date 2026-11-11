@@ -1,5 +1,10 @@
 :root {
   color-scheme: light dark;
+  --pi-font-size: calc(var(--vscode-font-size, 13px) + 2px);
+  --pi-font-content: calc(var(--pi-font-size) - 1px);
+  --pi-font-small: calc(var(--pi-font-size) - 2px);
+  --pi-font-compact: calc(var(--pi-font-size) - 3px);
+  --pi-font-code: calc(var(--vscode-editor-font-size, 12px) + 2px);
   --pi-bg: var(--vscode-sideBar-background);
   --pi-fg: var(--vscode-foreground);
   --pi-accent: var(--vscode-textLink-foreground);
@@ -12,4 +17,76 @@
   --pi-tool-error: var(--vscode-errorForeground);
   --pi-diff: var(--vscode-diffEditor-insertedTextBackground);
   --pi-focus: var(--vscode-focusBorder);
+  --pi-surface: var(--vscode-input-background, var(--pi-bg));
+  --pi-soft: color-mix(in srgb, var(--pi-fg) 4%, var(--pi-bg));
+  --pi-line: color-mix(in srgb, var(--pi-fg) 12%, var(--pi-bg));
+  --pi-hover: var(--vscode-toolbar-hoverBackground, var(--pi-soft));
+  --pi-button: var(--vscode-button-background, var(--pi-accent));
+  --pi-button-text: var(--vscode-button-foreground, var(--pi-bg));
+  --pi-popup-shadow: 0 6px 24px
+    var(
+      --vscode-widget-shadow,
+      color-mix(in srgb, var(--pi-fg) 15%, transparent)
+    );
+
+  --wa-font-family-body: var(--vscode-font-family, system-ui);
+  --wa-font-family-heading: var(--wa-font-family-body);
+  --wa-font-size-s: var(--pi-font-small);
+  --wa-font-size-m: var(--pi-font-content);
+  --wa-color-surface-default: var(--pi-surface);
+  --wa-color-surface-raised: var(
+    --vscode-dropdown-background,
+    var(--pi-surface)
+  );
+  --wa-color-surface-lowered: var(--pi-soft);
+  --wa-color-surface-border: var(--pi-line);
+  --wa-color-text-normal: var(--pi-fg);
+  --wa-color-text-quiet: var(--pi-muted);
+  --wa-color-text-link: var(--pi-accent);
+  --wa-color-focus: var(--pi-focus);
+  --wa-color-shadow: var(--vscode-widget-shadow, var(--pi-line));
+  --wa-color-neutral-fill-quiet: var(--pi-hover);
+  --wa-color-neutral-fill-normal: var(--pi-soft);
+  --wa-color-neutral-border-quiet: var(--pi-line);
+  --wa-color-neutral-border-normal: var(--pi-line);
+  --wa-color-neutral-border-loud: var(--pi-muted);
+  --wa-color-neutral-on-quiet: var(--pi-fg);
+  --wa-color-neutral-on-normal: var(--pi-fg);
+  --wa-color-brand-fill-quiet: var(--pi-hover);
+  --wa-color-brand-fill-normal: var(--pi-soft);
+  --wa-color-brand-fill-loud: var(--pi-button);
+  --wa-color-brand-border-quiet: var(--pi-line);
+  --wa-color-brand-border-normal: var(--pi-accent);
+  --wa-color-brand-border-loud: var(--pi-accent);
+  --wa-color-brand-on-quiet: var(--pi-accent);
+  --wa-color-brand-on-normal: var(--pi-accent);
+  --wa-color-brand-on-loud: var(--pi-button-text);
+  --wa-color-danger-fill-quiet: color-mix(
+    in srgb,
+    var(--pi-tool-error) 8%,
+    var(--pi-bg)
+  );
+  --wa-color-danger-border-normal: var(--pi-line);
+  --wa-color-danger-on-quiet: var(--pi-tool-error);
+  --wa-color-danger-on-normal: var(--pi-tool-error);
+  --wa-form-control-background-color: var(--pi-surface);
+  --wa-form-control-border-color: var(--vscode-input-border, var(--pi-line));
+  --wa-form-control-value-color: var(--pi-fg);
+  --wa-form-control-placeholder-color: var(
+    --vscode-input-placeholderForeground,
+    var(--pi-muted)
+  );
+  --wa-form-control-hint-color: var(--pi-muted);
+  --wa-form-control-label-color: var(--pi-fg);
+  --wa-form-control-activated-color: var(--pi-button);
+  --wa-form-control-padding-block: 7px;
+  --wa-form-control-padding-inline: 10px;
+  --wa-focus-ring-width: 2px;
+  --wa-focus-ring-offset: 2px;
+  --wa-border-radius-m: 6px;
+}
+.vscode-high-contrast,
+.vscode-high-contrast-light {
+  --pi-line: var(--vscode-contrastBorder, var(--pi-border));
+  --wa-form-control-border-color: var(--pi-line);
 }

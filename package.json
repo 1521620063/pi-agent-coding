@@ -2,7 +2,7 @@
   "name": "pi-sidebar",
   "displayName": "PI",
   "description": "A native-feeling VS Code sidebar for your locally installed PI coding agent.",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "publisher": "pi-extension",
   "license": "MIT",
   "repository": {
@@ -10,7 +10,7 @@
     "url": "https://github.com/1521620063/PI-Extension.git"
   },
   "engines": {
-    "vscode": "^1.95.0"
+    "vscode": "^1.106.0"
   },
   "categories": [
     "AI",
@@ -32,7 +32,7 @@
   ],
   "contributes": {
     "viewsContainers": {
-      "activitybar": [
+      "secondarySidebar": [
         {
           "id": "pi",
           "title": "PI",
@@ -131,6 +131,7 @@
     "vitest": "^5.1.0"
   },
   "dependencies": {
+    "@awesome.me/webawesome": "3.14.0",
     "dompurify": "^3.4.17",
     "markdown-it": "^15.0.3"
   }

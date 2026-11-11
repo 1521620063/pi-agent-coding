@@ -4,7 +4,7 @@
 !LICENSE
 !dist/extension.js
 !dist/webview.js
+!dist/webview.css
 !dist/styles.css
 !dist/theme.css
 !media/pi.svg
-!docs/testing.md
