@@ -86,7 +86,7 @@ footer {
   min-height: 92px;
   max-height: 26vh;
   font-size: var(--pi-font-content);
-  line-height: 1.65;
+  line-height: 1.6;
   outline: none;
 }
 .input-actions {
@@ -175,14 +175,89 @@ wa-option::part(label) {
   font-size: 9px;
   opacity: 0.7;
 }
-#model {
+#model-menu {
   max-width: 70%;
+  min-width: 0;
+}
+#model {
+  max-width: 100%;
 }
 #model::part(base) {
   color: var(--pi-fg);
 }
 #thinking {
   flex-shrink: 0;
+}
+#model-menu::part(menu),
+#thinking-menu::part(menu) {
+  max-height: min(350px, 55vh);
+  overflow: auto;
+}
+#model-menu::part(menu) {
+  width: min(360px, calc(100vw - 24px));
+}
+#model-menu wa-dropdown-item::part(label) {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+#model-menu wa-dropdown-item::part(details) {
+  font-size: var(--pi-font-compact);
+  color: var(--pi-muted);
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#history-popup::part(popup) {
+  z-index: 100;
+}
+#history-panel {
+  width: min(340px, calc(100vw - 16px));
+  max-width: var(--auto-size-available-width);
+  max-height: min(420px, var(--auto-size-available-height, 65vh));
+  overflow: auto;
+  background: var(--wa-color-surface-raised);
+  border: 1px solid var(--pi-line);
+  border-radius: 9px;
+  box-shadow: var(--pi-popup-shadow);
+  padding: 6px;
+  font-size: var(--pi-font-small);
+}
+.history-heading {
+  padding: 5px 8px;
+  font-weight: 600;
+}
+.history-hint,
+.history-empty {
+  margin: 4px 8px;
+  font-size: var(--pi-font-compact);
+}
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.history-session {
+  flex: 1;
+  min-width: 0;
+}
+.history-session::part(base) {
+  width: 100%;
+  justify-content: flex-start;
+}
+.history-session::part(label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-session[aria-current="true"]::part(base) {
+  color: var(--pi-fg);
+  background: var(--pi-hover);
+}
+.history-remove {
+  flex-shrink: 0;
+}
+#history-panel wa-button::part(base) {
+  font-size: var(--pi-font-small);
 }
 .statusline {
   gap: 3px 8px;
@@ -352,7 +427,7 @@ wa-button.command-option::part(label) {
   .composer-meta {
     flex-wrap: wrap;
   }
-  #model {
+  #model-menu {
     max-width: 100%;
   }
 }

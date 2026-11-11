@@ -26,6 +26,36 @@ export class SessionService {
       .filter((ref) => ref.workspaceUri === workspaceUri)
       .sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt));
   }
+  async refreshList(): Promise<void> {
+    const workspace = this.store.getSnapshot().workspace;
+    const refs = workspace
+      ? await this.list(pathToFileURL(workspace).href)
+      : [];
+    if (this.store.getSnapshot().workspace !== workspace) return;
+    this.store.update({
+      sessions: refs.map(({ sessionPath, sessionId, name, lastOpenedAt }) => ({
+        sessionPath,
+        sessionId,
+        name,
+        lastOpenedAt,
+      })),
+    });
+  }
+  private async indexedRef(sessionPath: string): Promise<SessionRef> {
+    const workspace = this.store.getSnapshot().workspace;
+    if (!workspace) throw new Error("请先连接工作区。");
+    const ref = (await this.list(pathToFileURL(workspace).href)).find(
+      (item) => item.sessionPath === sessionPath,
+    );
+    if (!ref) throw new Error("当前工作区历史中没有此会话，请刷新后重试。");
+    return ref;
+  }
+  async selectFromHistory(sessionPath: string): Promise<void> {
+    await this.resume(await this.indexedRef(sessionPath));
+  }
+  async removeFromHistory(sessionPath: string): Promise<void> {
+    await this.remove(await this.indexedRef(sessionPath));
+  }
   private refs(): SessionRef[] {
     const refs = this.memory.get("pi.sessions.v1", []);
     return Array.isArray(refs)
@@ -59,6 +89,7 @@ export class SessionService {
         ),
       ].slice(0, 100),
     );
+    await this.refreshList();
   }
   async remove(ref: SessionRef): Promise<void> {
     await this.memory.update(
@@ -69,6 +100,7 @@ export class SessionService {
           item.workspaceUri !== ref.workspaceUri,
       ),
     );
+    await this.refreshList();
   }
   async refresh(): Promise<void> {
     const state = await this.pi.request({ type: "get_state" });

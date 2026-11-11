@@ -54,3 +54,26 @@ it("blocks sends and competing changes during session transitions while keeping 
   await change;
   await expect(gate.run("send", async () => {})).resolves.toBeUndefined();
 });
+
+it.each(["selectSession", "removeSession", "chooseModel", "chooseThinking"])(
+  "serializes sidebar changes during %s without blocking stop",
+  async (type) => {
+    const gate = new ActionGate();
+    let done!: () => void;
+    const pending = gate.run(
+      type,
+      () =>
+        new Promise<void>((resolve) => {
+          done = resolve;
+        }),
+    );
+    try {
+      await expect(gate.run("selectSession", async () => {})).rejects.toThrow();
+      await expect(gate.run("removeSession", async () => {})).rejects.toThrow();
+      await expect(gate.run("stop", async () => {})).resolves.toBeUndefined();
+    } finally {
+      done();
+      await pending;
+    }
+  },
+);

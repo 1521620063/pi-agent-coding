@@ -48,6 +48,86 @@ it("routes a Web Awesome menu selection once without forwarding unrelated values
   expect(postMessage).toHaveBeenCalledTimes(1);
 });
 
+it("selects model and thinking levels next to their controls using the menu item in event.detail", () => {
+  const state = new SessionStore().getSnapshot();
+  state.connection = "connected";
+  state.models = [
+    { id: "m1", name: "模型一", provider: "test", input: ["text"] },
+  ];
+  state.thinkingLevels = ["low", "high"];
+  state.model = state.models[0];
+  state.thinkingLevel = "low";
+  snapshot(state);
+  const model = control("model-menu").querySelector("wa-dropdown-item")!;
+  Object.assign(model, { checked: false });
+  Object.assign(control("model-menu"), { open: true });
+  const thinking =
+    control("thinking-menu").querySelectorAll("wa-dropdown-item")[1];
+  control("model-menu").dispatchEvent(
+    new CustomEvent("wa-select", { detail: { item: model } }),
+  );
+  control("thinking-menu").dispatchEvent(
+    new CustomEvent("wa-select", { detail: { item: thinking } }),
+  );
+  expect(postMessage.mock.calls).toEqual([
+    [{ type: "chooseModel", provider: "test", modelId: "m1" }],
+    [{ type: "chooseThinking", level: "high" }],
+  ]);
+  expect((model as HTMLElement & { checked: boolean }).checked).toBe(true);
+  expect((control("model-menu") as HTMLElement & { open: boolean }).open).toBe(
+    false,
+  );
+});
+
+it("opens history beside its button, removes a row without selecting it, and closes with Escape", () => {
+  const state = new SessionStore().getSnapshot();
+  state.connection = "connected";
+  state.sessions = [
+    {
+      sessionId: "s1",
+      sessionPath: "one.jsonl",
+      name: "会话一",
+      lastOpenedAt: "2026-11-11",
+    },
+  ];
+  snapshot(state);
+  control("sessions").click();
+  expect(control("history-panel").hidden).toBe(false);
+  expect(control("sessions").getAttribute("aria-expanded")).toBe("true");
+  control("history-panel")
+    .querySelector<HTMLElement>("[data-remove-session]")!
+    .click();
+  expect(postMessage.mock.calls).toEqual([
+    [{ type: "sessions" }],
+    [{ type: "removeSession", sessionPath: "one.jsonl" }],
+  ]);
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+  );
+  expect(control("history-panel").hidden).toBe(true);
+  expect(control("sessions").getAttribute("aria-expanded")).toBe("false");
+});
+
+it("selects history locally without altering the draft", () => {
+  const state = new SessionStore().getSnapshot();
+  state.connection = "connected";
+  state.sessions = [
+    { sessionId: "s1", sessionPath: "one.jsonl", lastOpenedAt: "2026-11-11" },
+  ];
+  value("prompt", "保留草稿");
+  snapshot(state);
+  control("sessions").click();
+  control("history-panel")
+    .querySelector<HTMLElement>("[data-select-session]")!
+    .click();
+  expect(postMessage).toHaveBeenLastCalledWith({
+    type: "selectSession",
+    sessionPath: "one.jsonl",
+  });
+  expect(control("history-panel").hidden).toBe(true);
+  expect((control("prompt") as HTMLTextAreaElement).value).toBe("保留草稿");
+});
+
 it("preserves IME composition and Shift+Enter, then sends the selected queue mode once", () => {
   const prompt = value("prompt", "中文草稿");
   value("mode", "steer");

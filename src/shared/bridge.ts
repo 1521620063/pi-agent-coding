@@ -38,6 +38,7 @@ export interface ViewState {
   model?: Model;
   thinkingLevel?: ThinkingLevel;
   thinkingLevels: ThinkingLevel[];
+  sessions?: SessionSummary[];
   commands: SlashCommand[];
   stats?: SessionStats;
   compaction: JsonObject;
@@ -48,6 +49,12 @@ export interface ViewState {
   title?: string;
   shell?: JsonObject;
 }
+export interface SessionSummary {
+  sessionPath: string;
+  sessionId: string;
+  name?: string;
+  lastOpenedAt: string;
+}
 export type ClientAction =
   | {
       type:
@@ -57,8 +64,7 @@ export type ClientAction =
         | "stop"
         | "attachFiles"
         | "attachSelection"
-        | "chooseModel"
-        | "chooseThinking"
+        | "refreshModels"
         | "sessions"
         | "newSession"
         | "openSession"
@@ -80,6 +86,9 @@ export type ClientAction =
       mode: "steer" | "followUp";
     }
   | { type: "removeAttachment"; id: string }
+  | { type: "chooseModel"; provider: string; modelId: string }
+  | { type: "chooseThinking"; level: ThinkingLevel }
+  | { type: "selectSession" | "removeSession"; sessionPath: string }
   | { type: "image"; data: string; mimeType: string; name: string }
   | { type: "autoCompaction" | "autoRetry"; enabled: boolean }
   | { type: "shell"; command: string; excludeFromContext: boolean }
@@ -97,8 +106,7 @@ const simple = new Set([
   "stop",
   "attachFiles",
   "attachSelection",
-  "chooseModel",
-  "chooseThinking",
+  "refreshModels",
   "sessions",
   "newSession",
   "openSession",
@@ -118,6 +126,31 @@ export function parseClientAction(value: unknown): ClientAction | undefined {
   const keys = Object.keys(value);
   if (simple.has(value.type))
     return keys.length === 1 ? (value as ClientAction) : undefined;
+  if (
+    value.type === "chooseModel" &&
+    keys.length === 3 &&
+    typeof value.provider === "string" &&
+    value.provider.length > 0 &&
+    value.provider.length <= 1000 &&
+    typeof value.modelId === "string" &&
+    value.modelId.length > 0 &&
+    value.modelId.length <= 1000
+  )
+    return value as ClientAction;
+  if (
+    value.type === "chooseThinking" &&
+    keys.length === 2 &&
+    ["off", "minimal", "low", "medium", "high", "xhigh"].includes(value.level)
+  )
+    return value as ClientAction;
+  if (
+    ["selectSession", "removeSession"].includes(value.type) &&
+    keys.length === 2 &&
+    typeof value.sessionPath === "string" &&
+    value.sessionPath.length > 0 &&
+    value.sessionPath.length <= 32768
+  )
+    return value as ClientAction;
   if (
     value.type === "send" &&
     keys.every((k) => ["type", "text", "attachmentIds", "mode"].includes(k)) &&

@@ -435,9 +435,13 @@ main {
   border-radius: 10px;
   background: color-mix(in srgb, var(--pi-accent) 6%, var(--pi-bg));
 }
+.user-message,
+.assistant-message {
+  font-size: var(--pi-font-content);
+  line-height: 1.6;
+}
 .assistant-message {
   margin: 0 0 25px;
-  line-height: 1.7;
 }
 .markdown p {
   margin: 10px 0;
@@ -481,7 +485,7 @@ main {
   padding: 8px 12px;
   margin-top: 5px;
   border-left: 1px solid var(--pi-line);
-  line-height: 1.65;
+  line-height: 1.6;
 }
 .tool {
   padding: 0;

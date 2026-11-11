@@ -14,7 +14,15 @@ export const sidebarMarkup = `
 <header>
   <strong aria-hidden="true">π</strong><span id="title">PI</span><div class="spacer"></div>
   <wa-button size="s" appearance="plain" variant="neutral" data-action="newSession" aria-label="新建会话" title="新建会话"><wa-icon name="plus"></wa-icon></wa-button>
-  <wa-button size="s" appearance="plain" variant="neutral" data-action="sessions">历史</wa-button>
+  <wa-popup id="history-popup" placement="bottom-end" distance="6" flip shift shift-padding="8" auto-size="both" auto-size-padding="8">
+    <wa-button slot="anchor" id="sessions" size="s" appearance="plain" variant="neutral" aria-haspopup="dialog" aria-expanded="false" aria-controls="history-panel">历史</wa-button>
+    <section id="history-panel" role="dialog" aria-label="当前工作区历史" tabindex="-1" hidden>
+      <div class="history-heading">工作区历史</div>
+      <div id="history-list"></div>
+      <wa-button id="history-open" size="s" appearance="plain" variant="neutral">打开其他 PI 会话文件…</wa-button>
+      <p class="muted history-hint">移除记录会保留 PI 会话文件</p>
+    </section>
+  </wa-popup>
   <wa-dropdown id="actions" size="s" placement="bottom-end">
     <wa-button slot="trigger" size="s" appearance="plain" variant="neutral" aria-label="更多操作" title="更多操作"><wa-icon name="ellipsis"></wa-icon></wa-button>
     ${moreActions.map(([value, label]) => `<wa-dropdown-item value="${value}">${label}</wa-dropdown-item>`).join("")}
@@ -39,8 +47,12 @@ export const sidebarMarkup = `
       </div>
     </div>
     <div class="composer-meta">
-      <wa-button data-action="chooseModel" id="model" size="s" appearance="plain" variant="neutral" title="切换 PI 模型"><span id="model-name">选择模型</span><wa-icon slot="end" name="chevron-down"></wa-icon></wa-button>
-      <wa-button data-action="chooseThinking" id="thinking" size="s" appearance="plain" variant="neutral" title="调整思考强度"><span id="thinking-name">思考</span><wa-icon slot="end" name="chevron-down"></wa-icon></wa-button>
+      <wa-dropdown id="model-menu" size="s" placement="top-start">
+        <wa-button slot="trigger" id="model" size="s" appearance="plain" variant="neutral" title="切换 PI 模型"><span id="model-name">选择模型</span><wa-icon slot="end" name="chevron-down"></wa-icon></wa-button>
+      </wa-dropdown>
+      <wa-dropdown id="thinking-menu" size="s" placement="top-end">
+        <wa-button slot="trigger" id="thinking" size="s" appearance="plain" variant="neutral" title="调整思考强度"><span id="thinking-name">思考</span><wa-icon slot="end" name="chevron-down"></wa-icon></wa-button>
+      </wa-dropdown>
     </div>
   </div>
   <div class="statusline composer-hint"><span>Enter 发送 · Shift+Enter 换行</span><span id="usage"></span></div>

@@ -1,10 +1,10 @@
 :root {
   color-scheme: light dark;
-  --pi-font-size: calc(var(--vscode-font-size, 13px) + 2px);
-  --pi-font-content: calc(var(--pi-font-size) - 1px);
-  --pi-font-small: calc(var(--pi-font-size) - 2px);
-  --pi-font-compact: calc(var(--pi-font-size) - 3px);
-  --pi-font-code: calc(var(--vscode-editor-font-size, 12px) + 2px);
+  --pi-font-size: var(--vscode-font-size, 13px);
+  --pi-font-content: var(--pi-font-size);
+  --pi-font-small: var(--pi-font-size);
+  --pi-font-compact: calc(var(--pi-font-size) - 1px);
+  --pi-font-code: var(--pi-font-content);
   --pi-bg: var(--vscode-sideBar-background);
   --pi-fg: var(--vscode-foreground);
   --pi-accent: var(--vscode-textLink-foreground);

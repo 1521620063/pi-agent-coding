@@ -12,7 +12,6 @@ import { QueueService } from "./features/queues";
 import { ContextService, RetryService } from "./features/context";
 import { HistoryService } from "./features/history";
 import { ShellService } from "./features/shell";
-import { pathToFileURL } from "node:url";
 import { ActionGate } from "./features/action-gate";
 let activeController: PiController | undefined;
 export function activate(context: vscode.ExtensionContext) {
@@ -221,31 +220,23 @@ export function activate(context: vscode.ExtensionContext) {
             name: action.name,
           });
         }
+        if (action.type === "refreshModels") await models.refresh();
         if (action.type === "chooseModel") {
-          await models.refresh();
-          const pick = await vscode.window.showQuickPick(
-            store.getSnapshot().models.map((model) => ({
-              label: model.name ?? model.id,
-              description: model.provider,
-              model,
-            })),
-            { title: "PI 模型" },
-          );
-          if (pick) {
-            await models.select(pick.model.provider, pick.model.id);
-            await usage.refreshStats();
-          }
-        }
-        if (action.type === "chooseThinking") {
-          await models.refresh();
-          const pick = await vscode.window.showQuickPick(
-            store
+          if (
+            !store
               .getSnapshot()
-              .thinkingLevels.map((level) => ({ label: level, level })),
-            { title: "PI 思考强度" },
-          );
-          if (pick) await models.setThinking(pick.level);
+              .models.some(
+                (model) =>
+                  model.provider === action.provider &&
+                  model.id === action.modelId,
+              )
+          )
+            throw new Error("此模型已不可用，请刷新后重试。");
+          await models.select(action.provider, action.modelId);
+          await usage.refreshStats();
         }
+        if (action.type === "chooseThinking")
+          await models.setThinking(action.level);
         if (action.type === "stop") await controller.stopAll();
         if (action.type === "openLink")
           await vscode.env.openExternal(vscode.Uri.parse(action.url));
@@ -265,40 +256,16 @@ export function activate(context: vscode.ExtensionContext) {
           });
           if (name !== undefined) await sessions.rename(name);
         }
-        if (action.type === "sessions") {
-          const workspace = store.getSnapshot().workspace;
-          if (!workspace) throw new Error("请先连接工作区。");
-          const refs = await sessions.list(pathToFileURL(workspace).href);
-          const pick = await vscode.window.showQuickPick(
-            [
-              { label: "打开其他 PI 会话文件…", ref: undefined },
-              ...refs.map((ref) => ({
-                label: ref.name ?? ref.sessionId,
-                description: ref.lastOpenedAt,
-                ref,
-              })),
-            ],
-            { title: "当前工作区通过插件打开的会话" },
-          );
-          if (pick) {
-            try {
-              if (pick.ref) await sessions.resume(pick.ref);
-              else await sessions.openFromPicker();
-              await Promise.all([
-                models.refresh(),
-                commands.refresh(),
-                usage.refreshStats(),
-              ]);
-            } catch (error) {
-              if (pick.ref) {
-                const choice = await vscode.window.showWarningMessage(
-                  `恢复失败：${String(error)}`,
-                  "移除此索引",
-                );
-                if (choice) await sessions.remove(pick.ref);
-              } else throw error;
-            }
-          }
+        if (action.type === "sessions") await sessions.refreshList();
+        if (action.type === "removeSession")
+          await sessions.removeFromHistory(action.sessionPath);
+        if (action.type === "selectSession") {
+          await sessions.selectFromHistory(action.sessionPath);
+          await Promise.all([
+            models.refresh(),
+            commands.refresh(),
+            usage.refreshStats(),
+          ]);
         }
         if (action.type === "clearQueue") {
           const cleared = await queues.clear();

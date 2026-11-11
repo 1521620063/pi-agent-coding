@@ -19,4 +19,21 @@ describe("host message boundary", () => {
     ).toBeUndefined();
     expect(parseClientAction(null)).toBeUndefined();
   });
+  it("validates selections from the sidebar instead of accepting arbitrary payloads", () => {
+    for (const action of [
+      { type: "chooseModel", provider: "test", modelId: "model" },
+      { type: "chooseThinking", level: "high" },
+      { type: "selectSession", sessionPath: "session.jsonl" },
+      { type: "removeSession", sessionPath: "session.jsonl" },
+    ])
+      expect(parseClientAction(action)).toEqual(action);
+    for (const action of [
+      { type: "chooseModel" },
+      { type: "chooseModel", provider: "test", modelId: 42 },
+      { type: "chooseThinking", level: "arbitrary" },
+      { type: "selectSession", sessionPath: "" },
+      { type: "removeSession", sessionPath: "a", workspaceUri: "other" },
+    ])
+      expect(parseClientAction(action)).toBeUndefined();
+  });
 });

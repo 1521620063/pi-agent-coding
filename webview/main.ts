@@ -13,6 +13,7 @@ import {
   type FormTextarea,
 } from "./components";
 import { moreActions, sidebarMarkup } from "./layout";
+import { setupSelections } from "./selections";
 import type { WaSelectEvent } from "@awesome.me/webawesome/dist/events/select.js";
 import "./forms.css";
 declare function acquireVsCodeApi(): {
@@ -26,6 +27,7 @@ const root = document.getElementById("app")!;
 root.innerHTML = sidebarMarkup;
 const byId = <T extends HTMLElement = HTMLElement>(id: string) =>
   document.getElementById(id) as T;
+const selections = setupSelections(root, post);
 const prompt = byId<FormTextarea>("prompt");
 const promptText = () => prompt.value ?? "";
 const restored = vscode.getState();
@@ -127,6 +129,7 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
   }
   if (data.type !== "snapshot") return;
   state = data.state;
+  selections.render(state);
   if (state.error) submitting = false;
   renderChat(byId("transcript"), state);
   renderState();

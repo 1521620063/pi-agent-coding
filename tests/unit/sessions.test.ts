@@ -42,3 +42,15 @@ it("rebuilds the current branch through PI and scopes persisted references by wo
   expect(await sessions.list("file:///C:/work")).toHaveLength(1);
   expect(await sessions.list("file:///C:/elsewhere")).toHaveLength(0);
 });
+
+it("publishes and removes only indexed history entries in the current workspace", async () => {
+  const { sessions, store, pi } = setup();
+  await sessions.remember();
+  expect(store.getSnapshot().sessions?.[0].sessionId).toBe("old");
+  await expect(sessions.removeFromHistory("unindexed.jsonl")).rejects.toThrow();
+  await expect(sessions.selectFromHistory("unindexed.jsonl")).rejects.toThrow();
+  await sessions.removeFromHistory("old.jsonl");
+  expect(store.getSnapshot().sessions).toEqual([]);
+  expect(store.getSnapshot().session?.id).toBe("old");
+  expect(pi.request).not.toHaveBeenCalled();
+});
