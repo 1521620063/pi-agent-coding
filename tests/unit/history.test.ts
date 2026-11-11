@@ -1,5 +1,37 @@
-import { expect, it, vi } from 'vitest';
-import { HistoryService } from '../../src/features/history';
-import { SessionStore } from '../../src/state/session-store';
-it('only forks current PI-provided user entries and preserves returned draft without sending',async()=>{const request=vi.fn(async(cmd:any)=>cmd.type==='get_fork_messages'?{messages:[{entryId:'valid',text:'old prompt'}]}:{cancelled:false,text:'old prompt'});const refresh=vi.fn(async()=>{});const store=new SessionStore();const history=new HistoryService({request,stopAll:async()=>{}} as any,store,refresh);await expect(history.fork('invented')).rejects.toThrow();await history.listForkPoints();await history.fork('valid');expect(store.getSnapshot().editorText?.text).toBe('old prompt');expect(request.mock.calls.some(([cmd])=>cmd.type==='prompt')).toBe(false);expect(refresh).toHaveBeenCalledOnce();});
-it('does not export when the save dialog is cancelled or refresh after cancelled clone',async()=>{const request=vi.fn(async()=>({cancelled:true}));const refresh=vi.fn(async()=>{});const history=new HistoryService({request,stopAll:async()=>{}} as any,new SessionStore(),refresh,async()=>undefined);expect(await history.exportHtml()).toBeUndefined();expect(request).not.toHaveBeenCalled();await history.clone();expect(refresh).not.toHaveBeenCalled();});
+import { expect, it, vi } from "vitest";
+import { HistoryService } from "../../src/features/history";
+import { SessionStore } from "../../src/state/session-store";
+it("only forks current PI-provided user entries and preserves returned draft without sending", async () => {
+  const request = vi.fn(async (cmd: any) =>
+    cmd.type === "get_fork_messages"
+      ? { messages: [{ entryId: "valid", text: "old prompt" }] }
+      : { cancelled: false, text: "old prompt" },
+  );
+  const refresh = vi.fn(async () => {});
+  const store = new SessionStore();
+  const history = new HistoryService(
+    { request, stopAll: async () => {} } as any,
+    store,
+    refresh,
+  );
+  await expect(history.fork("invented")).rejects.toThrow();
+  await history.listForkPoints();
+  await history.fork("valid");
+  expect(store.getSnapshot().editorText?.text).toBe("old prompt");
+  expect(request.mock.calls.some(([cmd]) => cmd.type === "prompt")).toBe(false);
+  expect(refresh).toHaveBeenCalledOnce();
+});
+it("does not export when the save dialog is cancelled or refresh after cancelled clone", async () => {
+  const request = vi.fn(async () => ({ cancelled: true }));
+  const refresh = vi.fn(async () => {});
+  const history = new HistoryService(
+    { request, stopAll: async () => {} } as any,
+    new SessionStore(),
+    refresh,
+    async () => undefined,
+  );
+  expect(await history.exportHtml()).toBeUndefined();
+  expect(request).not.toHaveBeenCalled();
+  await history.clone();
+  expect(refresh).not.toHaveBeenCalled();
+});

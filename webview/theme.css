@@ -1,1 +1,15 @@
-:root{color-scheme:light dark;--pi-bg:var(--vscode-sideBar-background);--pi-fg:var(--vscode-foreground);--pi-accent:var(--vscode-textLink-foreground);--pi-muted:var(--vscode-descriptionForeground);--pi-border:var(--vscode-panel-border);--pi-user:var(--vscode-textBlockQuote-background);--pi-thinking:var(--vscode-descriptionForeground);--pi-tool-pending:var(--vscode-editor-inactiveSelectionBackground);--pi-tool-success:var(--vscode-testing-iconPassed);--pi-tool-error:var(--vscode-errorForeground);--pi-diff:var(--vscode-diffEditor-insertedTextBackground);--pi-focus:var(--vscode-focusBorder)}
+:root {
+  color-scheme: light dark;
+  --pi-bg: var(--vscode-sideBar-background);
+  --pi-fg: var(--vscode-foreground);
+  --pi-accent: var(--vscode-textLink-foreground);
+  --pi-muted: var(--vscode-descriptionForeground);
+  --pi-border: var(--vscode-panel-border);
+  --pi-user: var(--vscode-textBlockQuote-background);
+  --pi-thinking: var(--vscode-descriptionForeground);
+  --pi-tool-pending: var(--vscode-editor-inactiveSelectionBackground);
+  --pi-tool-success: var(--vscode-testing-iconPassed);
+  --pi-tool-error: var(--vscode-errorForeground);
+  --pi-diff: var(--vscode-diffEditor-insertedTextBackground);
+  --pi-focus: var(--vscode-focusBorder);
+}

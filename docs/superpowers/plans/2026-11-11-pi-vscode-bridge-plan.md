@@ -1,4 +1,4 @@
-# PI VS Code Bridge Implementation Plan
+﻿# PI VS Code Bridge Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -8,7 +8,20 @@
 
 **Tech Stack:** TypeScript、VS Code Extension API、原生 TypeScript Webview、esbuild、Vitest + jsdom（DOM 单测）、VS Code Extension Development Host / `@vscode/test-electron` + Mocha（宿主测试）、`@vscode/vsce`。开发时选择兼容的依赖版本并提交 lockfile；本文不声称这些依赖已经安装。
 
-**Spec:** [PI VS Code 侧边栏桥接插件设计](../specs/2026-11-11-pi-vscode-bridge-design.md)。开始开发前阅读本文和设计说明；用户要求本次只准备文档，稍后再开发。
+**Spec:** [PI VS Code 侧边栏桥接插件设计](../specs/2026-11-11-pi-vscode-bridge-design.md)。用户已于 2026-11-11 要求开始开发。
+
+## 实施状态（2026-11-11）
+
+任务 1–11 的功能代码已实现，任务 12 已产出 VSIX 并完成本地安装验证。以下是实际状态；原逐步清单包含尚未全部完成的复合验收条件，保留未勾选，不能解读为全部验收通过。详细记录见 [验证文档](../../testing.md)。
+
+| 范围 | 实现 | 已验证 | 尚未验证 |
+| --- | --- | --- | --- |
+| P0：任务 1–7 | 完成 | 单元/集成/VS Code 宿主，真实 PI 文本、工具、图片、模型及会话 RPC | 完整多根/无工作区窗口矩阵、其他平台 |
+| P1：任务 8–9 | 完成 | 队列与停止、真实用量、重试/压缩夹具、真实小会话压缩拒绝 | 长会话成功压缩、真实供应商重试故障 |
+| P2：任务 10–11 | 完成 | 真实历史树、分叉、复制、导出、PI shell；扩展交互/通用工具夹具 | 已配置 MCP 与扩展交互的真实环境 |
+| 任务 12 | 包及文档完成 | check、40 单测、5 进程集成、5 宿主测试、11 文件 VSIX；隔离安装后再跑 5 宿主测试 | 原生 VS Code 完整视觉/辅助功能矩阵、独立代码审查 |
+
+视觉验收采用实际构建产物的浏览器夹具：暗色/浅色/高对比度，各 320px / 480px 与等效 200% 缩放，共九张截图；不是原生 VS Code 截图。宿主测试合并在 `tests/vscode/suite.ts`，运行器为 `scripts/test-vscode.mjs`。独立审查工具因消息丢失/连接超时未完成，已执行本地逐模块复核与回归测试。当前工作在 `feat/pi-sidebar` 分支及 `.worktrees/pi-sidebar`，未合并或推送。
 
 ## Global Constraints
 
