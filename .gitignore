@@ -1,0 +1,9 @@
+node_modules/
+dist/
+out/
+coverage/
+*.vsix
+.vscode-test/
+.worktrees/
+.superpowers/
+artifacts/
