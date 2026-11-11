@@ -17,6 +17,7 @@ export class PiController {
   version?: string;
   constructor(private store: SessionStore, private config: ControllerConfig, private log: (text: string) => void = () => {}) {}
   get pid() { return this.child?.pid; }
+  configure(config: ControllerConfig) { this.config = {...this.config,...config}; }
   onRecord(listener: (record: PiRecord) => void): Unsubscribe { this.listeners.add(listener); return () => this.listeners.delete(listener); }
   connect(workspaceUri: string): Promise<void> {
     if (this.connecting) return this.connecting;

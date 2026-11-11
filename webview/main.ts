@@ -25,7 +25,7 @@ function updateSend() { byId<HTMLButtonElement>('send').disabled=submitting || s
 window.addEventListener('message',({data}:MessageEvent<HostMessage>) => {
  if(data.type==='sent'){submitting=false;if(prompt.value===submittedText)prompt.value='';vscode.setState({draft:prompt.value});renderCommands();updateSend();return;}
  if(data.type!=='snapshot')return;state=data.state;if(state.error)submitting=false;renderChat(byId('transcript'),state);renderState();
- if(state.editorText&&state.editorText.revision!==editorRevision){editorRevision=state.editorText.revision;prompt.value=state.editorText.text;vscode.setState({draft:prompt.value});renderCommands();}
+ if(state.editorText&&state.editorText.revision!==editorRevision){editorRevision=state.editorText.revision;prompt.value=state.editorText.append?[prompt.value,state.editorText.text].filter(Boolean).join('\n\n'):state.editorText.text;vscode.setState({draft:prompt.value});renderCommands();}
 });
 function renderState() {
  if(!state)return;updateSend();byId('title').textContent=state.title??state.session?.name??'PI';const error=byId('error');error.hidden=!state.error;error.textContent=state.error??'';

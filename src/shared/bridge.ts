@@ -10,7 +10,7 @@ export interface ViewState {
   attachments: Attachment[]; models: Model[]; model?: Model; thinkingLevel?: ThinkingLevel; thinkingLevels: ThinkingLevel[];
   commands: SlashCommand[]; stats?: SessionStats; compaction: JsonObject; retry: JsonObject;
   statuses: Record<string, string>; widgets: Record<string, { lines: string[]; placement: string }>;
-  editorText?: { text: string; revision: number }; title?: string; shell?: JsonObject;
+  editorText?: { text: string; revision: number; append?: boolean }; title?: string; shell?: JsonObject;
 }
 export type ClientAction = { type: 'ready' | 'connect' | 'disconnect' | 'stop' | 'attachFiles' | 'attachSelection' | 'chooseModel' | 'chooseThinking' | 'sessions' | 'newSession' | 'openSession' | 'renameSession' | 'compact' | 'clearQueue' | 'cancelRetry' | 'fork' | 'clone' | 'tree' | 'export' | 'cancelShell' | 'settings' }
  | { type: 'send'; text: string; attachmentIds: string[]; mode: 'steer' | 'followUp' }
