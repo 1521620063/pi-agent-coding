@@ -147,7 +147,12 @@ export type HostMessage =
       truncated: boolean;
       error?: string;
     }
-  | { type: "sent"; attachmentIds: string[] };
+  | { type: "sent"; attachmentIds: string[]; preserveDraft?: boolean }
+  | { type: "commandCompleted"; text: string }
+  | {
+      type: "showControl";
+      control: "model" | "thinking" | "history" | "settings";
+    };
 export function snapshotMessage(state: ViewState): HostMessage {
   return { type: "snapshot", state };
 }

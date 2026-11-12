@@ -106,8 +106,59 @@ it("navigates slash completion without sending, and ignores IME Enter", () => {
   composer.keydown(new KeyboardEvent("keydown", { key: "ArrowDown" }));
   composer.refresh(); // Streaming snapshots must not reset the highlighted command.
   composer.keydown(new KeyboardEvent("keydown", { key: "Tab" }));
-  expect(prompt.value).toBe("/two ");
+  expect(prompt.value).toBe("/compact ");
   expect(post).not.toHaveBeenCalled();
+});
+
+it("offers built-in session commands without PI-discovered commands", () => {
+  const prompt = Object.assign(document.createElement("wa-textarea"), {
+    value: "/",
+  }) as FormTextarea;
+  const menu = document.createElement("div");
+  const post = vi.fn();
+  const composer = setupComposer(
+    prompt,
+    menu,
+    post,
+    () => [],
+    () => {},
+    new PromptHistory(),
+  );
+  composer.refresh();
+  expect(menu.textContent).toContain("/new");
+  expect(menu.textContent).toContain("/compact");
+  prompt.value = "/comp";
+  composer.refresh();
+  composer.keydown(new KeyboardEvent("keydown", { key: "Tab" }));
+  expect(prompt.value).toBe("/compact ");
+  expect(post).not.toHaveBeenCalled();
+});
+
+it("prioritizes shortcuts while preserving PI commands with colliding names", () => {
+  const prompt = Object.assign(document.createElement("wa-textarea"), {
+    value: "/",
+  }) as FormTextarea;
+  const menu = document.createElement("div");
+  const composer = setupComposer(
+    prompt,
+    menu,
+    () => {},
+    () => [
+      { name: "model", source: "prompt", description: "自定义模板" },
+      ...Array.from({ length: 40 }, (_, n) => ({
+        name: `custom-${n}`,
+        source: "extension",
+      })),
+    ],
+    () => {},
+    new PromptHistory(),
+  );
+  composer.refresh();
+  expect(menu.firstElementChild?.textContent).toContain("/new");
+  prompt.value = "/model";
+  composer.refresh();
+  expect(menu.textContent).toContain("自定义模板");
+  expect(menu.querySelectorAll("[role=option]")).toHaveLength(1);
 });
 
 it("restores a draft with Down after recalling a multiline history entry", () => {

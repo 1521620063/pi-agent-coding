@@ -15,6 +15,7 @@ import {
 import { moreActions, sidebarMarkup } from "./layout";
 import { setupSelections } from "./selections";
 import { PromptHistory, setupComposer } from "./composer";
+import { parseBuiltinCommand } from "../src/shared/commands";
 import type { WaSelectEvent } from "@awesome.me/webawesome/dist/events/select.js";
 import "./forms.css";
 declare function acquireVsCodeApi(): {
@@ -36,6 +37,7 @@ const restored = vscode.getState();
 prompt.value = restored?.draft ?? "";
 let state: ViewState | undefined;
 let submitting = false;
+let stoppingFromPrompt = false;
 let promotingRevision: number | undefined;
 let submittedText = "";
 let editorRevision = restored?.editorRevision ?? 0;
@@ -53,7 +55,10 @@ const composer = setupComposer(
   byId("command-menu"),
   post,
   () => state?.commands ?? [],
-  saveDraft,
+  () => {
+    saveDraft();
+    updateSend();
+  },
   inputHistory,
 );
 byId<FormInput>("conversation-search").addEventListener("input", () => {
@@ -106,6 +111,7 @@ prompt.addEventListener("input", () => {
   inputHistory.reset();
   saveDraft();
   if (!composing) composer.refresh();
+  updateSend();
 });
 prompt.addEventListener("click", () => {
   if (!composing) composer.refresh();
@@ -137,6 +143,18 @@ function updateShellControls() {
   byId("cancel-shell").hidden = !state?.shell?.active;
 }
 function send() {
+  if (state?.connection === "connected" && isStopCommand() && !composing) {
+    if (stoppingFromPrompt) return;
+    stoppingFromPrompt = true;
+    updateSend();
+    post({
+      type: "send",
+      text: promptText(),
+      attachmentIds: [],
+      mode: "followUp",
+    });
+    return;
+  }
   if (
     !state ||
     state.connection !== "connected" ||
@@ -160,22 +178,41 @@ function send() {
     mode: "followUp",
   });
 }
+function isStopCommand() {
+  const command = parseBuiltinCommand(promptText(), state?.commands);
+  return command?.name === "stop" && !command.args;
+}
 function updateSend() {
   byId<FormButton>("send").disabled =
-    submitting ||
-    !!state?.queueControl?.busy ||
-    promotingRevision !== undefined ||
-    state?.connection !== "connected";
+    (isStopCommand()
+      ? stoppingFromPrompt
+      : submitting ||
+        !!state?.queueControl?.busy ||
+        promotingRevision !== undefined) || state?.connection !== "connected";
 }
 window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
+  if (data.type === "showControl") {
+    selections.show(data.control);
+    return;
+  }
+  if (data.type === "commandCompleted") {
+    stoppingFromPrompt = false;
+    inputHistory.record(data.text);
+    if (promptText() === data.text) prompt.value = "";
+    saveDraft();
+    renderCommands();
+    updateSend();
+    return;
+  }
   if (data.type === "fileCandidates" || data.type === "contextAttached") {
     composer.receive(data);
     return;
   }
   if (data.type === "sent") {
-    if (submitting) inputHistory.record(submittedText);
+    if (submitting && !data.preserveDraft) inputHistory.record(submittedText);
     submitting = false;
-    if (promptText() === submittedText) prompt.value = "";
+    if (!data.preserveDraft && promptText() === submittedText)
+      prompt.value = "";
     saveDraft();
     renderCommands();
     updateSend();
@@ -191,7 +228,10 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
   )
     promotingRevision = undefined;
   selections.render(state);
-  if (state.error) submitting = false;
+  if (state.error) {
+    submitting = false;
+    stoppingFromPrompt = false;
+  }
   renderChat(
     byId("transcript"),
     state,
@@ -270,6 +310,23 @@ function renderState() {
   ]
     .filter(Boolean)
     .join(" · ");
+  const usage = byId<HTMLButtonElement>("usage");
+  usage.disabled =
+    state.connection !== "connected" ||
+    state.run !== "idle" ||
+    !!state.compaction.active ||
+    !!state.queueControl?.busy;
+  usage.setAttribute("aria-busy", String(!!state.compaction.active));
+  usage.title =
+    state.connection !== "connected"
+      ? "连接 PI 后可手动压缩上下文"
+      : state.compaction.active
+        ? "正在压缩上下文…"
+        : state.run !== "idle" || state.queueControl?.busy
+          ? "当前任务结束后可手动压缩上下文"
+          : "点击手动压缩上下文";
+  usage.setAttribute("aria-label", `${usage.textContent} · ${usage.title}`);
+  if (state.compaction.active) usage.append(" · 正在压缩…");
   byId<FormSwitch>("auto-compaction").checked = !!state.compaction.enabled;
   byId<FormSwitch>("auto-retry").checked = !!state.retry.enabled;
   for (const channel of ["steering", "followUp"] as const) {
@@ -322,6 +379,11 @@ function renderState() {
   }
   if (state.compaction.error)
     activity.append(element("span", "error", state.compaction.error));
+  if (state.compaction.notice) {
+    const notice = element("span", "muted", state.compaction.notice);
+    notice.setAttribute("role", "status");
+    activity.append(notice);
+  }
   if (state.pendingUi.length)
     activity.append(
       element("span", "muted", "PI 正等待交互，请查看 VS Code 提示。"),
@@ -373,7 +435,10 @@ function renderState() {
     state.shell?.error ? `错误：${state.shell.error}` : "",
     state.shell?.exitCode === undefined
       ? ""
-      : `退出码：${state.shell.exitCode}`,
+      : `命令退出码：${state.shell.exitCode}`,
+    !state.shell?.active && state.shell?.exitCode === 127
+      ? "未找到 Bash 命令（127）。请检查命令名称及运行环境；如需向 AI 提问，请使用上方聊天输入框。"
+      : "",
   ]
     .filter(Boolean)
     .join("\n");

@@ -5,6 +5,7 @@ import type {
 } from "../src/shared/bridge";
 import type { FormTextarea } from "./components";
 import { formButton } from "./components";
+import { builtinCommands } from "../src/shared/commands";
 
 export function findMention(text: string, cursor: number) {
   const match = /(?:^|\s)@([^\n@]*)$/.exec(text.slice(0, cursor));
@@ -153,7 +154,13 @@ export function setupComposer(
     } else if (slash) {
       const selected = options[active]?.label;
       lastQuery = `/${slash[1]}`;
-      options = commands()
+      const discovered = commands();
+      options = [
+        ...builtinCommands
+          .filter((cmd) => !discovered.some((item) => item.name === cmd.name))
+          .map((cmd) => ({ ...cmd, source: "插件快捷操作" })),
+        ...discovered,
+      ]
         .filter((cmd) =>
           cmd.name.toLowerCase().includes(slash[1].toLowerCase()),
         )

@@ -178,6 +178,76 @@ it("keeps newer typing when the previous send is acknowledged", () => {
   );
 });
 
+it("preserves a cancelled command draft and releases submission state", () => {
+  value("prompt", "/fork");
+  control("send").click();
+  window.dispatchEvent(
+    new MessageEvent("message", {
+      data: { type: "sent", attachmentIds: [], preserveDraft: true },
+    }),
+  );
+  expect((control("prompt") as HTMLTextAreaElement).value).toBe("/fork");
+  expect((control("send") as HTMLButtonElement).disabled).toBe(false);
+});
+
+it("opens existing sidebar controls from slash commands", () => {
+  for (const [name, id] of [
+    ["history", "history-panel"],
+    ["settings", "settings-panel"],
+  ]) {
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { type: "showControl", control: name },
+      }),
+    );
+    expect(control(id).hidden).toBe(false);
+  }
+  control("settings-close").click();
+});
+
+it("sends /stop while another submission and queue promotion are pending", () => {
+  const prompt = value("prompt", "/compact 保留重点");
+  control("send").click();
+  const state = new SessionStore().getSnapshot();
+  state.connection = "connected";
+  state.queueControl = { revision: 3, busy: true, canSteer: false };
+  state.attachments = [
+    { id: "file", kind: "text", name: "file.ts", size: 1, preview: "x" },
+  ];
+  snapshot(state);
+  value("prompt", "/stop").dispatchEvent(new Event("input"));
+  prompt.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  // First Enter completes the selected slash option; the second executes it.
+  prompt.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
+  expect(postMessage).toHaveBeenLastCalledWith({
+    type: "send",
+    text: "/stop ",
+    attachmentIds: [],
+    mode: "followUp",
+  });
+  window.dispatchEvent(
+    new MessageEvent("message", {
+      data: { type: "commandCompleted", text: "/stop " },
+    }),
+  );
+  expect((prompt as HTMLTextAreaElement).value).toBe("");
+  value("prompt", "新的草稿");
+  sent();
+  expect((prompt as HTMLTextAreaElement).value).toBe("新的草稿");
+});
+
 it("routes switch values and shell form values through existing actions", () => {
   Object.assign(control("auto-compaction"), { checked: true }).dispatchEvent(
     new Event("change"),
@@ -233,4 +303,82 @@ it("disables empty shell execution and exposes cancellation only while PI shell 
   snapshot(state);
   expect(run.disabled).toBe(true);
   expect(cancel.hidden).toBe(false);
+});
+
+it("opens manual compaction from usage and blocks it while busy or disconnected", () => {
+  const state = new SessionStore().getSnapshot();
+  state.connection = "connected";
+  snapshot(state);
+  const usage = control("usage") as HTMLButtonElement;
+  expect(usage.tagName).toBe("BUTTON");
+  usage.click();
+  expect(postMessage.mock.calls).toEqual([[{ type: "compact" }]]);
+  state.compaction = { active: true };
+  snapshot(state);
+  expect(usage.disabled).toBe(true);
+  usage.click();
+  expect(postMessage).toHaveBeenCalledTimes(1);
+  expect(usage.textContent).toContain("正在压缩");
+  expect(usage.getAttribute("aria-busy")).toBe("true");
+  state.compaction = { active: false, error: "session too small" };
+  snapshot(state);
+  expect(usage.disabled).toBe(false);
+  expect(control("activity").textContent).toContain("session too small");
+  state.run = "running";
+  snapshot(state);
+  expect(usage.disabled).toBe(true);
+  state.run = "idle";
+  state.connection = "disconnected";
+  snapshot(state);
+  expect(usage.disabled).toBe(true);
+});
+
+it("shows a nothing-to-compact notice once without error styling and leaves chat usable", () => {
+  const state = new SessionStore().getSnapshot();
+  state.connection = "connected";
+  state.compaction = {
+    active: false,
+    notice: "当前会话内容较少，PI 暂无可压缩的上下文，可继续对话。",
+  };
+  snapshot(state);
+  expect(control("activity").textContent).toContain("暂无可压缩");
+  expect(control("activity").querySelector(".error")).toBeNull();
+  expect(control("error").hidden).toBe(true);
+  expect((control("usage") as HTMLButtonElement).disabled).toBe(false);
+  value("prompt", "继续对话");
+  control("send").click();
+  expect(postMessage).toHaveBeenLastCalledWith({
+    type: "send",
+    text: "继续对话",
+    attachmentIds: [],
+    mode: "followUp",
+  });
+});
+
+it("explains a missing Bash command without treating its exit code as a PI disconnect", () => {
+  const state = new SessionStore().getSnapshot();
+  state.connection = "connected";
+  value("shell-command", "你好");
+  state.shell = {
+    active: false,
+    output: "/usr/bin/bash: line 1: 你好: command not found",
+    exitCode: 127,
+  };
+  snapshot(state);
+  expect(control("shell-output").textContent).toContain("命令退出码：127");
+  expect(control("shell-output").textContent).toContain("未找到 Bash 命令");
+  expect(control("shell-output").textContent).toContain("上方聊天输入框");
+  expect(control("connection").hidden).toBe(true);
+  expect((control("run-shell") as HTMLButtonElement).disabled).toBe(false);
+  value("prompt", "你好");
+  control("send").click();
+  expect(postMessage).toHaveBeenLastCalledWith({
+    type: "send",
+    text: "你好",
+    attachmentIds: [],
+    mode: "followUp",
+  });
+  state.shell = { active: false, output: "PI", exitCode: 0 };
+  snapshot(state);
+  expect(control("shell-output").textContent).toBe("PI\n命令退出码：0");
 });

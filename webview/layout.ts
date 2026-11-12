@@ -82,14 +82,14 @@ export const sidebarMarkup = `
       </div>
     </div>
   </div>
-  <div class="statusline composer-hint"><span>Enter 发送 · Shift+Enter 换行<span id="queue-send-hint" hidden> · 运行中默认排队</span></span><span id="usage"></span></div>
+  <div class="statusline composer-hint"><span>Enter 发送 · Shift+Enter 换行<span id="queue-send-hint" hidden> · 运行中默认排队</span></span><button type="button" id="usage" data-action="compact" aria-label="手动压缩上下文" title="点击手动压缩上下文" disabled></button></div>
   <div class="statusline" id="statuses" hidden></div>
 
 </footer>
 <div id="widgets-below"></div>
-<details id="shell-panel"><summary>PI 命令</summary>
+<details id="shell-panel"><summary>Bash 命令（由 PI 执行）</summary>
   <div class="shell-fields">
-    <wa-input id="shell-command" size="s" label="命令" placeholder="输入要执行的命令" hint="由 PI 执行，输出默认加入下一次请求的上下文。" spellcheck="false" autocomplete="off"></wa-input>
+    <wa-input id="shell-command" size="s" label="Bash 命令" placeholder="例如：git status 或 echo PI" hint="直接执行 Bash 命令；向 AI 提问请用上方聊天输入框。输出默认加入下一次请求的上下文。" spellcheck="false" autocomplete="off"></wa-input>
     <wa-switch id="shell-exclude" size="s" hint="本次输出仅用于查看">不加入上下文</wa-switch>
     <div class="shell-actions"><wa-button id="run-shell" size="s" appearance="outlined" variant="brand" disabled>运行命令</wa-button><wa-button data-action="cancelShell" id="cancel-shell" size="s" appearance="plain" variant="danger" hidden>取消命令</wa-button></div>
     <pre id="shell-output" aria-live="polite"></pre>

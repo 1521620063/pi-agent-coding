@@ -267,5 +267,18 @@ export function setupSelections(
     }
     if (hadFocus && !panel.hidden) panel.focus();
   }
-  return { render };
+  return {
+    render,
+    show(control: "model" | "thinking" | "history" | "settings") {
+      if (control === "settings") {
+        if (settingsPanel.hidden) settingsTrigger.click();
+        else settingsPanel.focus();
+      } else if (control === "history") {
+        if (panel.hidden) trigger.click();
+        else panel.focus();
+      } else if (current?.connection === "connected") {
+        (control === "model" ? modelMenu : thinkingMenu).open = true;
+      }
+    },
+  };
 }

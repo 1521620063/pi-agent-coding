@@ -145,6 +145,149 @@ try {
   await page.locator("#model-name").filter({ hasText: "test" }).waitFor();
   const prompt = page.locator("#prompt textarea");
   assert.equal(await prompt.inputValue(), "保留草稿");
+  // Usage is a keyboard-accessible shortcut to the existing host compact flow.
+  const usage = page.locator("#usage");
+  await usage.click();
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "compact",
+  });
+  await usage.focus();
+  for (const key of ["Enter", "Space"]) {
+    const count = await page.evaluate(() => window.actions.length);
+    await page.keyboard.press(key);
+    assert.equal(await page.evaluate(() => window.actions.length), count + 1);
+    assert.equal(
+      await page.evaluate(() => window.actions.at(-1).type),
+      "compact",
+    );
+  }
+  await page.evaluate(() =>
+    window.deliver({
+      type: "snapshot",
+      state: { ...window.fixtureState, compaction: { active: true } },
+    }),
+  );
+  assert.equal(await usage.isDisabled(), true);
+  assert.match(await usage.textContent(), /正在压缩/);
+  assert.equal(await usage.getAttribute("aria-busy"), "true");
+  await page.evaluate(() =>
+    window.deliver({
+      type: "snapshot",
+      state: {
+        ...window.fixtureState,
+        compaction: { active: false, error: "session too small" },
+      },
+    }),
+  );
+  assert.equal(await usage.isEnabled(), true);
+  assert.match(
+    await page.locator("#activity").textContent(),
+    /session too small/,
+  );
+  await page.evaluate(() =>
+    window.deliver({
+      type: "snapshot",
+      state: {
+        ...window.fixtureState,
+        compaction: {
+          active: false,
+          notice: "当前会话内容较少，PI 暂无可压缩的上下文，可继续对话。",
+        },
+      },
+    }),
+  );
+  assert.match(
+    await page.locator("#activity [role=status]").textContent(),
+    /暂无可压缩/,
+  );
+  assert.equal(await page.locator("#activity .error").count(), 0);
+  assert.equal(await page.locator("#error").isVisible(), false);
+  assert.equal(await usage.isEnabled(), true);
+  await page.screenshot({
+    path: join(artifacts, "compact-not-needed.png"),
+    fullPage: true,
+  });
+  await page.evaluate(() =>
+    window.deliver({ type: "snapshot", state: window.fixtureState }),
+  );
+  // Bash failures must leave chat usable and explain the command/process distinction.
+  await page.locator("#shell-panel summary").click();
+  const shellInput = page.locator("#shell-command input");
+  await shellInput.fill("你好");
+  await page.locator("#run-shell").click();
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "shell",
+    command: "你好",
+    excludeFromContext: false,
+  });
+  await page.evaluate(() =>
+    window.deliver({
+      type: "snapshot",
+      state: { ...window.fixtureState, shell: { active: true, output: "" } },
+    }),
+  );
+  assert.equal(
+    await page.locator("#run-shell").evaluate((node) => node.disabled),
+    true,
+  );
+  assert.equal(await page.locator("#cancel-shell").isVisible(), true);
+  await page.evaluate(() => {
+    window.fixtureState = {
+      ...window.fixtureState,
+      shell: {
+        active: false,
+        output: "/usr/bin/bash: line 1: 你好: command not found",
+        exitCode: 127,
+      },
+    };
+    window.deliver({ type: "snapshot", state: window.fixtureState });
+  });
+  assert.match(
+    await page.locator("#shell-output").textContent(),
+    /命令退出码：127/,
+  );
+  assert.match(
+    await page.locator("#shell-output").textContent(),
+    /未找到 Bash 命令.*上方聊天输入框/,
+  );
+  assert.equal(await page.locator("#connection").isVisible(), false);
+  assert.equal(
+    await page.locator("#run-shell").evaluate((node) => node.disabled),
+    false,
+  );
+  await prompt.fill("你好");
+  await prompt.press("Enter");
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "send",
+    text: "你好",
+    attachmentIds: [],
+    mode: "followUp",
+  });
+  await page.evaluate(() => window.deliver({ type: "sent" }));
+  await shellInput.fill("echo PI");
+  await page.locator("#run-shell").click();
+  assert.equal(
+    await page.evaluate(() => window.actions.at(-1).command),
+    "echo PI",
+  );
+  await page.evaluate(() =>
+    window.deliver({
+      type: "snapshot",
+      state: {
+        ...window.fixtureState,
+        shell: { active: false, output: "PI", exitCode: 0 },
+      },
+    }),
+  );
+  assert.equal(
+    await page.locator("#shell-output").textContent(),
+    "PI\n命令退出码：0",
+  );
+  await page.evaluate(() =>
+    window.deliver({ type: "snapshot", state: window.fixtureState }),
+  );
+  await page.locator("#shell-panel summary").click();
+  await prompt.fill("保留草稿");
   // Forking the first prompt leaves an empty branch but must keep the editor usable.
   await page.locator('[data-message-index="0"]').click();
   assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
@@ -279,7 +422,119 @@ try {
   await prompt.fill("/");
   await prompt.press("ArrowDown");
   await prompt.press("Tab");
-  assert.equal(await prompt.inputValue(), "/beta ");
+  assert.equal(await prompt.inputValue(), "/compact ");
+  await prompt.fill("/");
+  for (const name of [
+    "new",
+    "compact",
+    "model",
+    "thinking",
+    "resume",
+    "name",
+    "fork",
+    "clone",
+    "tree",
+    "export",
+    "settings",
+    "stop",
+  ])
+    assert.equal(
+      await page
+        .locator("#command-menu [role=option]")
+        .filter({ hasText: `/${name} ·` })
+        .count(),
+      1,
+    );
+  await prompt.fill("/comp");
+  await prompt.press("Tab");
+  assert.equal(await prompt.inputValue(), "/compact ");
+  await prompt.fill("/compact 保留文件名");
+  await prompt.press("Enter");
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "send",
+    text: "/compact 保留文件名",
+    attachmentIds: [],
+    mode: "followUp",
+  });
+  await page.evaluate(() =>
+    window.deliver({ type: "sent", attachmentIds: [] }),
+  );
+  assert.equal(await prompt.inputValue(), "");
+  for (const [command, control, selector] of [
+    ["model", "model", "#model-menu"],
+    ["thinking", "thinking", "#thinking-menu"],
+    ["resume", "history", "#history-panel"],
+    ["settings", "settings", "#settings-panel"],
+  ]) {
+    await prompt.fill(`/${command} `);
+    await prompt.press("Enter");
+    if (control === "model" || control === "thinking")
+      await page.evaluate((selector) => {
+        window.menuShown = new Promise((resolve) =>
+          document
+            .querySelector(selector)
+            .addEventListener("wa-after-show", resolve, { once: true }),
+        );
+      }, selector);
+    await page.evaluate((control) => {
+      window.deliver({ type: "sent", attachmentIds: [] });
+      window.deliver({ type: "showControl", control });
+    }, control);
+    if (control === "model" || control === "thinking")
+      await page.evaluate(() => window.menuShown);
+    else await page.locator(selector).waitFor({ state: "visible" });
+    if (control === "settings") await page.locator("#settings-close").click();
+    else if (control === "history")
+      await page.locator(selector).press("Escape");
+    else {
+      await page.evaluate((selector) => {
+        window.menuHidden = new Promise((resolve) =>
+          document
+            .querySelector(selector)
+            .addEventListener("wa-after-hide", resolve, { once: true }),
+        );
+      }, selector);
+      await page.locator(`${selector} [slot=trigger]`).click();
+      await page.evaluate(() => window.menuHidden);
+    }
+  }
+  await prompt.fill("/fork ");
+  await prompt.press("Enter");
+  await page.evaluate(() =>
+    window.deliver({ type: "sent", attachmentIds: [], preserveDraft: true }),
+  );
+  assert.equal(await prompt.inputValue(), "/fork ");
+  await prompt.fill("/compact 保留重点");
+  await prompt.press("Enter");
+  await page.evaluate(() =>
+    window.deliver({
+      type: "snapshot",
+      state: {
+        ...window.fixtureState,
+        compaction: { active: true },
+        queueControl: { revision: 3, busy: true, canSteer: false },
+      },
+    }),
+  );
+  await prompt.fill("/st");
+  await prompt.press("Tab");
+  assert.equal(await page.locator("#send").isEnabled(), true);
+  await page.locator("#send").click();
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "send",
+    text: "/stop ",
+    attachmentIds: [],
+    mode: "followUp",
+  });
+  await page.evaluate(() =>
+    window.deliver({ type: "commandCompleted", text: "/stop " }),
+  );
+  await prompt.fill("停止后的新草稿");
+  await page.evaluate(() => {
+    window.deliver({ type: "sent", attachmentIds: [] });
+    window.deliver({ type: "snapshot", state: window.fixtureState });
+  });
+  assert.equal(await prompt.inputValue(), "停止后的新草稿");
   await prompt.fill("输入法");
   const count = await page.evaluate(
     () => window.actions.filter((a) => a.type === "send").length,
@@ -634,6 +889,25 @@ try {
         );
         await page.keyboard.press("Escape");
         assert.equal(await page.locator("#settings-panel").isVisible(), false);
+        await prompt.fill("/");
+        await page.locator("#command-menu").waitFor();
+        await page
+          .locator("#command-menu [role=option]")
+          .filter({ hasText: "/stop ·" })
+          .scrollIntoViewIfNeeded();
+        assert.equal(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth > window.innerWidth + 1,
+          ),
+          false,
+          `Slash menu overflow: ${theme} ${width} ${zoom}`,
+        );
+        await page.screenshot({
+          path: join(artifacts, `commands-${theme}-${width}-${zoom}.png`),
+          fullPage: true,
+        });
+        await prompt.press("Escape");
+        await prompt.fill("保留草稿");
         const steer = page.locator('#queue [data-steer-index="0"]');
         await steer.scrollIntoViewIfNeeded();
         assert.equal(await steer.isVisible(), true);
@@ -725,6 +999,52 @@ try {
           window.deliver({ type: "snapshot", state: window.beforeFork });
           window.scrollTo(0, 0);
         });
+        await page.locator("#shell-panel summary").click();
+        await page.locator("#shell-output").scrollIntoViewIfNeeded();
+        assert.equal(await page.locator("#shell-output").isVisible(), true);
+        assert.equal(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth > window.innerWidth + 1,
+          ),
+          false,
+          `Bash panel overflow: ${theme} ${width} ${zoom}`,
+        );
+        await page.screenshot({
+          path: join(artifacts, `shell-${theme}-${width}-${zoom}.png`),
+          fullPage: true,
+        });
+        await page.locator("#shell-panel summary").click();
+        await page.evaluate(() =>
+          window.deliver({
+            type: "snapshot",
+            state: {
+              ...window.fixtureState,
+              run: "idle",
+              compaction: { active: true },
+              stats: {
+                tokens: { total: 123456 },
+                cost: 0.1234,
+                contextUsage: { percent: 45.6 },
+              },
+            },
+          }),
+        );
+        await usage.scrollIntoViewIfNeeded();
+        assert.equal(await usage.isDisabled(), true);
+        assert.equal(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth > window.innerWidth + 1,
+          ),
+          false,
+          `Usage overflow: ${theme} ${width} ${zoom}`,
+        );
+        await page.screenshot({
+          path: join(artifacts, `compact-${theme}-${width}-${zoom}.png`),
+          fullPage: true,
+        });
+        await page.evaluate(() =>
+          window.deliver({ type: "snapshot", state: window.fixtureState }),
+        );
       }
   }
   assert.deepEqual(failures, []);

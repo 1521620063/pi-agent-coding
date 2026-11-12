@@ -41,6 +41,8 @@ export class ContextService {
         ...this.store.getSnapshot().compaction,
         active: true,
         error: undefined,
+        notice: undefined,
+        result: undefined,
       },
     });
     try {
@@ -59,6 +61,21 @@ export class ContextService {
         await this.refreshStats();
       }
     } catch (error) {
+      // PI may decline a short session; this is not a failed connection or generation.
+      const message = error instanceof Error ? error.message : String(error);
+      if (/(?:^|: )Nothing to compact \(session too small\)$/.test(message)) {
+        if (this.store.getSnapshot().session?.id === id)
+          this.store.update({
+            compaction: {
+              ...this.store.getSnapshot().compaction,
+              active: false,
+              error: undefined,
+              result: undefined,
+              notice: "当前会话内容较少，PI 暂无可压缩的上下文，可继续对话。",
+            },
+          });
+        return;
+      }
       if (this.store.getSnapshot().session?.id === id)
         this.store.update({
           compaction: {

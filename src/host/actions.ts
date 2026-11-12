@@ -14,6 +14,7 @@ import type { ContextService, RetryService } from "../features/context";
 import type { HistoryService } from "../features/history";
 import type { ShellService } from "../features/shell";
 import type { ActionGate } from "../features/action-gate";
+import { parseBuiltinCommand } from "../shared/commands";
 
 interface ActionServices {
   store: SessionStore;
@@ -57,9 +58,44 @@ export function createActionHandler({
   extensionId,
   post,
 }: ActionServices) {
-  return async (action: ClientAction): Promise<void> =>
-    gate.run(action.type, async () => {
+  return async (action: ClientAction): Promise<void> => {
+    const commandText = action.type === "send" ? action.text : "";
+    const builtin =
+      action.type === "send"
+        ? parseBuiltinCommand(action.text, store.getSnapshot().commands)
+        : undefined;
+    return gate.run(builtin?.action ?? action.type, async () => {
+      let cancelled = false;
       if (action.type !== "searchFiles") store.update({ error: undefined });
+      if (builtin && action.type === "send") {
+        if (action.attachmentIds.length && builtin.name !== "stop")
+          throw new Error("会话命令不接收附件，请先移除附件。");
+        const state = store.getSnapshot();
+        if (state.connection !== "connected")
+          throw new Error("请先连接 PI 再执行会话命令。");
+        if (
+          builtin.args &&
+          builtin.name !== "compact" &&
+          builtin.name !== "name"
+        )
+          throw new Error(
+            `/${builtin.name} 不接收参数，请直接发送 /${builtin.name}。`,
+          );
+        if ("control" in builtin) {
+          post({ type: "sent", attachmentIds: [] });
+          post({ type: "showControl", control: builtin.control });
+          return;
+        }
+        if (
+          builtin.action === "compact" &&
+          (state.run !== "idle" ||
+            state.compaction.active ||
+            state.queueControl?.busy)
+        )
+          throw new Error("请等待当前任务或压缩完成后再压缩上下文。");
+        // Reuse the same handlers and transition gates as toolbar/menu actions.
+        action = { type: builtin.action };
+      }
       if (action.type === "searchFiles") {
         try {
           post({
@@ -266,13 +302,12 @@ export function createActionHandler({
       }
       if (action.type === "refreshModels") await models.refresh();
       if (action.type === "chooseModel") {
+        const { provider, modelId } = action;
         if (
           !store
             .getSnapshot()
             .models.some(
-              (model) =>
-                model.provider === action.provider &&
-                model.id === action.modelId,
+              (model) => model.provider === provider && model.id === modelId,
             )
         )
           throw new Error("此模型已不可用，请刷新后重试。");
@@ -309,11 +344,14 @@ export function createActionHandler({
         ]);
       }
       if (action.type === "renameSession") {
-        const name = await vscode.window.showInputBox({
-          title: "PI 会话名称",
-          value: store.getSnapshot().session?.name,
-        });
+        const name =
+          builtin?.args ||
+          (await vscode.window.showInputBox({
+            title: "PI 会话名称",
+            value: store.getSnapshot().session?.name,
+          }));
         if (name !== undefined) await sessions.rename(name);
+        else cancelled = true;
       }
       if (action.type === "sessions") await sessions.refreshList();
       if (action.type === "removeSession")
@@ -343,10 +381,12 @@ export function createActionHandler({
       if (action.type === "autoCompaction")
         await usage.setAutoCompaction(action.enabled);
       if (action.type === "compact") {
-        const instructions = await vscode.window.showInputBox({
-          title: "压缩上下文",
-          prompt: "可选：需要在摘要中保留什么？留空使用 PI 默认策略。",
-        });
+        const instructions = builtin
+          ? builtin.args
+          : await vscode.window.showInputBox({
+              title: "压缩上下文",
+              prompt: "可选：需要在摘要中保留什么？留空使用 PI 默认策略。",
+            });
         if (instructions !== undefined)
           await usage.compact(instructions || undefined);
       }
@@ -360,12 +400,14 @@ export function createActionHandler({
           { title: "从用户消息分叉 · 不回滚文件" },
         );
         if (pick) await history.fork(pick.point.entryId);
+        else cancelled = true;
       }
       if (action.type === "clone") await history.clone();
       if (action.type === "export") {
         const path = await history.exportHtml();
         if (path)
           void vscode.window.showInformationMessage(`PI 对话已导出：${path}`);
+        else cancelled = true;
       }
       if (action.type === "tree") {
         const result = await history.getTree();
@@ -402,5 +444,14 @@ export function createActionHandler({
       if (action.type === "shell")
         await shell.execute(action.command, action.excludeFromContext);
       if (action.type === "cancelShell") await shell.cancel();
+      if (builtin?.name === "stop")
+        post({ type: "commandCompleted", text: commandText });
+      else if (builtin)
+        post({
+          type: "sent",
+          attachmentIds: [],
+          ...(cancelled ? { preserveDraft: true } : {}),
+        });
     });
+  };
 }

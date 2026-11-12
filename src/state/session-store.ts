@@ -223,6 +223,7 @@ export class SessionStore {
           active: true,
           reason: record.reason,
           error: undefined,
+          notice: undefined,
         };
         changed = ["compaction"];
         break;

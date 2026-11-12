@@ -319,6 +319,27 @@ wa-dropdown-item[checkbox-adjacent] {
 }
 #usage {
   margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  cursor: pointer;
+}
+#usage:hover:enabled {
+  color: var(--pi-fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+#usage:focus-visible {
+  outline: 1px solid var(--pi-focus);
+  outline-offset: 3px;
+}
+#usage:disabled {
+  cursor: default;
 }
 .workspace-status {
   margin-top: 3px;
