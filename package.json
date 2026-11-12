@@ -23,15 +23,15 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/1521620063/PI-Extension.git"
+    "url": "https://github.com/1521620063/pi-agent-coding.git"
   },
   "engines": {
     "vscode": "^1.106.0"
   },
   "bugs": {
-    "url": "https://github.com/1521620063/PI-Extension/issues"
+    "url": "https://github.com/1521620063/pi-agent-coding/issues"
   },
-  "homepage": "https://github.com/1521620063/PI-Extension#readme",
+  "homepage": "https://github.com/1521620063/pi-agent-coding#readme",
   "categories": [
     "AI",
     "Other"

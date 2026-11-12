@@ -288,7 +288,7 @@ npm run compile
 
 消息与所选附件交给本机 PI；PI 可能按你的供应商配置将内容发送到外部模型服务。插件不另外保存供应商凭证，也不包含分析遥测。会话索引、草稿及 PI 会话的存储范围见 [隐私说明](PRIVACY.md)。
 
-问题和建议请提交到本仓库的 [Issues](https://github.com/1521620063/PI-Extension/issues)，附上扩展、VS Code、PI 版本及复现步骤。请在分享诊断前移除凭证、私人路径和会话内容。
+问题和建议请提交到本仓库的 [Issues](https://github.com/1521620063/pi-agent-coding/issues)，附上扩展、VS Code、PI 版本及复现步骤。请在分享诊断前移除凭证、私人路径和会话内容。
 
 ## 许可证
 
