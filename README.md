@@ -4,7 +4,7 @@
 
 插件通过 `pi --mode rpc` 桥接本机 PI：界面与编辑器上下文由插件提供，推理、模型、工具、技能和会话仍由 PI 管理。交互组织参考 Codex / Claude Code 的侧栏方式，视觉优先参考 PI 自身的文本布局、消息配色和紧凑状态栏，并适配 VS Code 主题。
 
-当前版本为 **1.0.2（正式版）**，扩展标识为 `SilasPaul.pi-agent-coding`。验证基线为 **Windows + PI 1.5.2**；首次上架完成前可通过 VSIX 安装。具体变更见 [更新记录](CHANGELOG.md)。
+当前版本为 **1.0.3（正式版）**，扩展标识为 `SilasPaul.pi-agent-coding`。验证基线为 **Windows + PI 1.5.2**；首次上架完成前可通过 VSIX 安装。具体变更见 [更新记录](CHANGELOG.md)。
 
 验收范围：当前仅验证 Windows 本地环境；真实模型生成、真实 MCP / 扩展交互和长会话成功压缩尚未完成端到端验收。模拟进程、浏览器夹具和扩展宿主测试不代表这些真实环境已经通过。完整说明见“范围与限制”。
 
@@ -81,7 +81,7 @@ PI 运行时显示点阵动画与 `Working`，结束后自动移除；启用系�
 
 上架后，可在扩展视图中搜索 `@id:SilasPaul.pi-agent-coding`，核对发布者为 **SilasPaul** 后安装；也可通过命令 `code --install-extension SilasPaul.pi-agent-coding` 安装。首次上架前请使用下面的 VSIX 方式。
 
-打开 VS Code 命令面板（Windows：`Ctrl+Shift+P`），运行 **Extensions: Install from VSIX…**，选择 `pi-agent-coding-1.0.2.vsix`。
+打开 VS Code 命令面板（Windows：`Ctrl+Shift+P`），运行 **Extensions: Install from VSIX…**，选择 `pi-agent-coding-1.0.3.vsix`。
 
 如果从源码开始，在仓库根目录执行以下命令生成安装包：
 
@@ -93,7 +93,7 @@ npm run package
 安装包生成于仓库根目录，文件名随 `package.json` 中的版本变化。也可以用 VS Code CLI 安装已生成的包：
 
 ```powershell
-code --install-extension .\pi-agent-coding-1.0.2.vsix
+code --install-extension .\pi-agent-coding-1.0.3.vsix
 ```
 
 ### 3. 连接 PI
