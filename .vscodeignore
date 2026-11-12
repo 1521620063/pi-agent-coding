@@ -5,7 +5,6 @@
 !THIRD_PARTY_NOTICES.txt
 !CHANGELOG.md
 !PRIVACY.md
-!media/screenshots/*.png
 !dist/extension.js
 !dist/webview.js
 !dist/webview.css
