@@ -4,7 +4,7 @@
 
 插件通过 `pi --mode rpc` 桥接本机 PI：界面与编辑器上下文由插件提供，推理、模型、工具、技能和会话仍由 PI 管理。交互组织参考 Codex / Claude Code 的侧栏方式，视觉优先参考 PI 自身的文本布局、消息配色和紧凑状态栏，并适配 VS Code 主题。
 
-当前版本为 **1.0.0（预览版）**，扩展标识为 `SilasPaul.pi-coding-agent`。验证基线为 **Windows + PI 1.5.2**；首次上架完成前可通过 VSIX 安装。具体变更见 [更新记录](CHANGELOG.md)。
+当前版本为 **1.0.0（预览版）**，扩展标识为 `SilasPaul.pi-sidebar`。验证基线为 **Windows + PI 1.5.2**；首次上架完成前可通过 VSIX 安装。具体变更见 [更新记录](CHANGELOG.md)。
 
 ## 界面
 
@@ -60,9 +60,9 @@ PI 运行时显示点阵动画与 `Working`，结束后自动移除；启用系�
 
 ### 2. 安装扩展
 
-上架后，可在扩展视图中搜索 `@id:SilasPaul.pi-coding-agent`，核对发布者为 **SilasPaul** 后安装；也可通过命令 `code --install-extension SilasPaul.pi-coding-agent` 安装。首次上架前请使用下面的 VSIX 方式。
+上架后，可在扩展视图中搜索 `@id:SilasPaul.pi-sidebar`，核对发布者为 **SilasPaul** 后安装；也可通过命令 `code --install-extension SilasPaul.pi-sidebar` 安装。首次上架前请使用下面的 VSIX 方式。
 
-打开 VS Code 命令面板（Windows：`Ctrl+Shift+P`），运行 **Extensions: Install from VSIX…**，选择 `pi-coding-agent-1.0.0.vsix`。
+打开 VS Code 命令面板（Windows：`Ctrl+Shift+P`），运行 **Extensions: Install from VSIX…**，选择 `pi-sidebar-1.0.0.vsix`。
 
 如果从源码开始，在仓库根目录执行以下命令生成安装包：
 
@@ -74,7 +74,7 @@ npm run package
 安装包生成于仓库根目录，文件名随 `package.json` 中的版本变化。也可以用 VS Code CLI 安装已生成的包：
 
 ```powershell
-code --install-extension .\pi-coding-agent-1.0.0.vsix
+code --install-extension .\pi-sidebar-1.0.0.vsix
 ```
 
 ### 3. 连接 PI
@@ -88,7 +88,7 @@ code --install-extension .\pi-coding-agent-1.0.0.vsix
 
 ## 配置
 
-在 VS Code 设置中搜索 `@ext:SilasPaul.pi-coding-agent`，或从侧栏的 **⋯ → 插件设置** 进入。
+在 VS Code 设置中搜索 `@ext:SilasPaul.pi-sidebar`，或从侧栏的 **⋯ → 插件设置** 进入。
 
 | 设置                   | 默认值                      | 说明                                                                           |
 | ---------------------- | --------------------------- | ------------------------------------------------------------------------------ |
