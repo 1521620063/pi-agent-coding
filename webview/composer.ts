@@ -103,7 +103,12 @@ export function setupComposer(
     }
     if (options.length)
       prompt.setAttribute("aria-activedescendant", `completion-${active}`);
-    menu.children[active]?.scrollIntoView?.({ block: "nearest" });
+    // Web Awesome 的按钮在下一轮微任务后才完成渲染，此时元素高度可用，
+    // 立即滚动会按未布局的高度计算，导致选中项停在可视区外。
+    queueMicrotask(() => {
+      if (menu.hidden) return;
+      menu.children[active]?.scrollIntoView?.({ block: "nearest" });
+    });
     if (note || !options.length) {
       const hint = document.createElement("div");
       hint.className = "muted completion-hint";

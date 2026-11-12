@@ -471,7 +471,8 @@ wa-switch::part(hint) {
 wa-button.command-option::part(base) {
   width: 100%;
   justify-content: flex-start;
-  padding: 7px 8px;
+  padding: 4px 8px;
+  min-height: 0;
   height: auto;
 }
 wa-button.command-option::part(label) {
@@ -550,9 +551,8 @@ wa-button.command-option::part(label) {
   width: 100%;
 }
 #command-menu .command-option[aria-selected="true"]::part(base) {
-  background: var(--pi-hover);
-  outline: 1px solid var(--pi-focus);
-  outline-offset: -1px;
+  color: var(--pi-selection-text);
+  background: var(--pi-selection);
 }
 .completion-hint {
   padding: 6px;

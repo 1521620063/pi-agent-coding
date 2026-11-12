@@ -743,12 +743,12 @@ input[type="checkbox"] {
 }
 #command-menu {
   margin: 4px;
-  padding: 4px;
+  padding: 2px;
   border: 1px solid var(--pi-line);
   border-radius: 6px;
 }
 .command-option {
-  padding: 7px 8px;
+  padding: 0;
 }
 .empty {
   padding: 24px 12px 48px;

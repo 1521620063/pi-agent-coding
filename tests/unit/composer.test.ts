@@ -110,6 +110,34 @@ it("navigates slash completion without sending, and ignores IME Enter", () => {
   expect(post).not.toHaveBeenCalled();
 });
 
+it("scrolls the highlighted completion into view after the list renders", async () => {
+  const prompt = Object.assign(document.createElement("wa-textarea"), {
+    value: "/",
+  }) as FormTextarea;
+  const menu = document.createElement("div");
+  menu.hidden = true;
+  const composer = setupComposer(
+    prompt,
+    menu,
+    () => {},
+    () => [],
+    () => {},
+    new PromptHistory(),
+  );
+  composer.refresh();
+  const first = menu.firstElementChild as HTMLElement;
+  const initial = vi.fn();
+  first.scrollIntoView = initial;
+  await Promise.resolve();
+  expect(initial).toHaveBeenCalledWith({ block: "nearest" });
+  composer.keydown(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+  const second = menu.children[1] as HTMLElement;
+  const next = vi.fn();
+  second.scrollIntoView = next;
+  await Promise.resolve();
+  expect(next).toHaveBeenCalledWith({ block: "nearest" });
+});
+
 it("offers built-in session commands without PI-discovered commands", () => {
   const prompt = Object.assign(document.createElement("wa-textarea"), {
     value: "/",
