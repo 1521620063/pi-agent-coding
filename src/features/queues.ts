@@ -41,7 +41,10 @@ export class QueueService {
     private pi: Pick<PiController, "request">,
     private store: SessionStore,
   ) {
-    this.unsubscribe = store.subscribe((state) => this.observe(state));
+    this.unsubscribe = store.subscribe(
+      (state) => this.observe(state),
+      ["connection", "session", "run", "queues", "queueControl"],
+    );
     this.observe(store.getSnapshot());
   }
 
@@ -104,11 +107,10 @@ export class QueueService {
         });
       }
     }
-    this.publish();
+    this.publish(state);
   }
 
-  private publish(): void {
-    const state = this.store.getSnapshot();
+  private publish(state = this.store.getSnapshot()): void {
     const entries = [...this.known.steering, ...this.known.followUp];
     let reason: string | undefined;
     if (this.operation) reason = "正在调整队列，请稍候。";

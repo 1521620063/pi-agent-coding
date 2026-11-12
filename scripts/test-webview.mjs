@@ -47,7 +47,7 @@ const server = createServer(async (request, response) => {
     if (!name) {
       response.setHeader("Content-Type", "text/html; charset=utf-8");
       response.end(
-        `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data:; style-src 'self'; script-src 'nonce-fixture';"><link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/webview.css"></head><body><div id="app"></div><script nonce="fixture" type="module" src="/fixture.js"></script></body></html>`,
+        `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>PI Webview Test</title><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data:; style-src 'self'; script-src 'nonce-fixture';"><link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/webview.css"></head><body><div id="app"></div><script nonce="fixture" type="module" src="/fixture.js"></script></body></html>`,
       );
     } else if (name === "fixture.js") {
       response.setHeader("Content-Type", "text/javascript");
@@ -140,6 +140,8 @@ const themes = {
 };
 try {
   await page.goto(address);
+  assert.equal(page.url(), `${address}/`);
+  assert.equal(await page.title(), "PI Webview Test");
   await page.locator("#model-name").filter({ hasText: "test" }).waitFor();
   const prompt = page.locator("#prompt textarea");
   assert.equal(await prompt.inputValue(), "保留草稿");
@@ -465,6 +467,64 @@ try {
     "none",
   );
   await page.emulateMedia({ reducedMotion: "no-preference" });
+  // A long transcript must keep historical selection, focus and scroll while
+  // only the active reply changes. This remains a browser fixture, not PI E2E.
+  const streaming = await page.evaluate(() => {
+    const original = window.fixtureState;
+    const state = structuredClone(original);
+    state.messages = Array.from({ length: 100 }, (_, index) => ({
+      role: index % 2 ? "assistant" : "user",
+      content:
+        `第 ${index} 条历史消息。` +
+        "保留历史正文与代码。".repeat(30) +
+        (index % 2 ? "\n\n```ts\nconst answer = 42;\n```" : ""),
+    }));
+    state.messages.push({ role: "assistant", content: "正在生成" });
+    window.deliver({ type: "snapshot", state });
+    const transcript = document.getElementById("transcript");
+    const historical = [...transcript.children].slice(0, 100);
+    const paragraph = historical[1].querySelector(".markdown p");
+    const button = historical[1].querySelector("button");
+    button.focus({ preventScroll: true });
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(paragraph);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    transcript.scrollTop = 100;
+    const scrollTop = transcript.scrollTop;
+    const samples = [];
+    for (let index = 0; index < 30; index++) {
+      const next = structuredClone(state);
+      next.messages.at(-1).content += " 流式新增内容".repeat(index + 1);
+      const start = performance.now();
+      window.deliver({ type: "snapshot", state: next });
+      samples.push(performance.now() - start);
+    }
+    const result = {
+      historicalMessages: 100,
+      updates: samples.length,
+      retainedNodes: historical.filter(
+        (node, index) => node === transcript.children[index],
+      ).length,
+      preservedFocus: document.activeElement === button,
+      preservedSelection: selection.toString() === paragraph.textContent,
+      preservedScroll: Math.abs(transcript.scrollTop - scrollTop) < 2,
+      medianMs: samples.sort((a, b) => a - b)[Math.floor(samples.length / 2)],
+      maxMs: Math.max(...samples),
+    };
+    window.deliver({ type: "snapshot", state: original });
+    return result;
+  });
+  assert.equal(
+    streaming.retainedNodes,
+    100,
+    "Streaming must retain historical message nodes",
+  );
+  assert.equal(streaming.preservedFocus, true);
+  assert.equal(streaming.preservedSelection, true);
+  assert.equal(streaming.preservedScroll, true);
+  console.log(`Streaming fixture: ${JSON.stringify(streaming)}`);
   for (const [theme, colors] of Object.entries(themes)) {
     for (const width of [320, 480])
       for (const zoom of [1, 2]) {
@@ -670,7 +730,7 @@ try {
   assert.deepEqual(failures, []);
   await writeFile(
     join(artifacts, "result.json"),
-    JSON.stringify({ passed: true, cases: 12, failures }, null, 2),
+    JSON.stringify({ passed: true, cases: 12, streaming, failures }, null, 2),
   );
   await page.evaluate(() =>
     window.deliver({

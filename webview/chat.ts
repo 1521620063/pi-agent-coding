@@ -60,6 +60,34 @@ export function element<K extends keyof HTMLElementTagNameMap>(
   if (text !== undefined) node.textContent = text;
   return node;
 }
+interface CachedNode {
+  signature: string;
+  node: HTMLElement;
+}
+interface ChatCache {
+  context: string;
+  messages: Map<number, CachedNode>;
+  tools: Map<string, CachedNode>;
+  empty?: HTMLElement;
+  noMatches?: HTMLElement;
+}
+const chats = new WeakMap<HTMLElement, ChatCache>();
+
+// Moving every child through a fragment would detach historical selection and
+// focus even when its contents are unchanged. Touch only out-of-order children.
+function reconcileChildren(parent: HTMLElement, children: HTMLElement[]) {
+  let cursor = parent.firstChild;
+  for (const child of children) {
+    if (child === cursor) cursor = cursor.nextSibling;
+    else parent.insertBefore(child, cursor);
+  }
+  while (cursor) {
+    const next = cursor.nextSibling;
+    cursor.remove();
+    cursor = next;
+  }
+}
+
 export function renderChat(
   container: HTMLElement,
   state: ViewState,
@@ -67,15 +95,42 @@ export function renderChat(
 ) {
   const nearBottom =
     container.scrollHeight - container.scrollTop - container.clientHeight < 70;
-  const opened = new Set(
-    [
-      ...container.querySelectorAll<HTMLDetailsElement>(
-        "details[open][data-key]",
-      ),
-    ].map((node) => node.dataset.key),
-  );
-  const fragment = document.createDocumentFragment();
+  const context = JSON.stringify([
+    state.workspace,
+    state.session?.id,
+    state.session?.path,
+  ]);
+  let cache = chats.get(container);
+  if (!cache || cache.context !== context) {
+    cache = { context, messages: new Map(), tools: new Map() };
+    chats.set(container, cache);
+  }
+  const tools = new Map<string, HTMLElement>();
+  for (const tool of state.tools) {
+    const signature = JSON.stringify(tool);
+    let cached = cache.tools.get(tool.id);
+    if (!cached) {
+      cached = { signature, node: renderTool(tool) };
+      cache.tools.set(tool.id, cached);
+    } else if (cached.signature !== signature) {
+      const updated = renderTool(tool);
+      cached.node.className = updated.className;
+      cached.node.replaceChildren(...updated.childNodes);
+      cached.signature = signature;
+    }
+    tools.set(tool.id, cached.node);
+  }
+  for (const id of cache.tools.keys())
+    if (!tools.has(id)) cache.tools.delete(id);
+  for (const index of cache.messages.keys())
+    if (
+      index >= state.messages.length ||
+      state.messages[index].role === "toolResult"
+    )
+      cache.messages.delete(index);
+  const children: HTMLElement[] = [];
   const shown = new Set<string>();
+  const normalizedQuery = query.toLocaleLowerCase();
   for (const [index, message] of state.messages.entries()) {
     if (message.role === "toolResult") continue;
     const text =
@@ -85,59 +140,97 @@ export function renderChat(
             .filter((block) => block?.type === "text")
             .map((block) => block.text ?? "")
             .join("\n");
-    if (query && !text.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
-      continue;
-    const node = element(
-      "article",
-      message.role === "user" ? "user-message" : "assistant-message",
+    if (query && !text.toLocaleLowerCase().includes(normalizedQuery)) continue;
+    const toolIds = Array.isArray(message.content)
+      ? message.content
+          .filter((block) => block?.type === "toolCall" && tools.has(block.id))
+          .map((block) => block.id as string)
+      : [];
+    const signature = JSON.stringify([
+      message.role,
+      message.content,
+      message.errorMessage,
+      toolIds,
+    ]);
+    let cached = cache.messages.get(index);
+    if (!cached || cached.signature !== signature) {
+      const node = element(
+        "article",
+        message.role === "user" ? "user-message" : "assistant-message",
+      );
+      renderContent(node, message, index, tools);
+      const actions = element("div", "content-actions");
+      if (message.role === "assistant" && text) {
+        const copy = contentButton("复制回复");
+        copy.dataset.copyText = text;
+        actions.append(copy);
+      }
+      if (message.role === "user") {
+        const edit = contentButton("修改后重新提问");
+        edit.title = "从此消息分叉并恢复到输入框，不回滚文件";
+        edit.dataset.messageIndex = String(index);
+        actions.append(edit);
+      }
+      node.append(actions);
+      if (message.errorMessage)
+        node.append(element("pre", "error", message.errorMessage));
+      if (cached) {
+        const opened = new Set(
+          [
+            ...cached.node.querySelectorAll<HTMLDetailsElement>(
+              "details[open][data-key]",
+            ),
+          ].map((details) => details.dataset.key),
+        );
+        cached.node.className = node.className;
+        cached.node.replaceChildren(...node.childNodes);
+        for (const details of cached.node.querySelectorAll<HTMLDetailsElement>(
+          "details[data-key]",
+        ))
+          if (opened.has(details.dataset.key)) details.open = true;
+        cached.signature = signature;
+      } else {
+        cached = { signature, node };
+        cache.messages.set(index, cached);
+      }
+    }
+    const edit = cached.node.querySelector<HTMLButtonElement>(
+      "[data-message-index]",
     );
-    renderContent(node, message, index, state.tools, shown);
-    const actions = element("div", "content-actions");
-    if (message.role === "assistant" && text) {
-      const copy = contentButton("复制回复");
-      copy.dataset.copyText = text;
-      actions.append(copy);
-    }
-    if (message.role === "user") {
-      const edit = contentButton("修改后重新提问");
-      edit.title = "从此消息分叉并恢复到输入框，不回滚文件";
-      edit.dataset.messageIndex = String(index);
+    if (edit && edit.disabled !== (state.connection !== "connected"))
       edit.disabled = state.connection !== "connected";
-      actions.append(edit);
-    }
-    node.append(actions);
-    fragment.append(node);
-    if (message.errorMessage)
-      node.append(element("pre", "error", message.errorMessage));
+    for (const id of toolIds) shown.add(id);
+    children.push(cached.node);
   }
   for (const tool of state.tools)
-    if (!query && !shown.has(tool.id)) fragment.append(renderTool(tool));
-  if (query && !fragment.childNodes.length)
-    fragment.append(
-      element("p", "muted", "当前可见对话没有匹配消息；可搜索 PI 完整历史。"),
+    if (!query && !shown.has(tool.id)) children.push(tools.get(tool.id)!);
+  if (query && !children.length) {
+    cache.noMatches ??= element(
+      "p",
+      "muted",
+      "当前可见对话没有匹配消息；可搜索 PI 完整历史。",
     );
-  if (!state.messages.length) {
-    const empty = element("div", "empty");
-    empty.append(
-      element("div", "pi-mark", "π"),
-      element("h1", "", "在这里，继续你的工作。"),
-      element("p", "", "本机 PI 的模型、工具与技能，直接在编辑器中使用。"),
-    );
-    fragment.append(empty);
+    children.push(cache.noMatches);
   }
-  container.replaceChildren(fragment);
-  for (const node of container.querySelectorAll<HTMLDetailsElement>(
-    "details[data-key]",
-  ))
-    if (opened.has(node.dataset.key)) node.open = true;
+  if (!state.messages.length) {
+    if (!cache.empty) {
+      cache.empty = element("div", "empty");
+      cache.empty.append(
+        element("div", "pi-mark", "π"),
+        element("h1", "", "在这里，继续你的工作。"),
+        element("p", "", "本机 PI 的模型、工具与技能，直接在编辑器中使用。"),
+      );
+    }
+    children.push(cache.empty);
+  }
+  reconcileChildren(container, children);
   if (nearBottom) container.scrollTop = container.scrollHeight;
 }
 function renderContent(
   node: HTMLElement,
   message: AgentMessage,
   index: number,
-  tools: ToolView[],
-  shown: Set<string>,
+  tools: Map<string, HTMLElement>,
 ) {
   if (typeof message.content === "string") {
     appendText(node, message.content);
@@ -156,11 +249,8 @@ function renderContent(
       node.append(details);
     } else if (block.type === "image") appendImage(node, block);
     else if (block.type === "toolCall") {
-      const tool = tools.find((tool) => tool.id === block.id);
-      if (tool) {
-        shown.add(tool.id);
-        node.append(renderTool(tool));
-      }
+      const tool = tools.get(block.id);
+      if (tool) node.append(tool);
     }
   }
 }

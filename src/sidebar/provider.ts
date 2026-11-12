@@ -18,16 +18,33 @@ export function createSidebarProvider(
   } {
   let view: vscode.WebviewView | undefined;
   const disposables: vscode.Disposable[] = [];
-  const unsubscribe = store.subscribe(() => {
-    // Another subscriber may derive queue controls synchronously during this event.
-    if (view)
-      void view.webview.postMessage(snapshotMessage(store.getSnapshot()));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const cancelSnapshot = () => {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = undefined;
+  };
+  const publishSnapshot = (includeHidden = false) => {
+    cancelSnapshot();
+    if (view && (view.visible || includeHidden))
+      return view.webview.postMessage(snapshotMessage(store.getSnapshot()));
+  };
+  const unsubscribe = store.subscribeChanges((changed) => {
+    // Editor revisions are ordered instructions, not replaceable display state.
+    // Preserve the existing delivery to resolved hidden views as well.
+    if (changed.includes("editorText")) {
+      void publishSnapshot(true);
+      return;
+    }
+    if (!view?.visible || timer !== undefined) return;
+    // Coalesce presentation only; business subscriptions remain synchronous.
+    timer = setTimeout(() => void publishSnapshot(), 16);
   });
   return {
     get isVisible() {
       return view?.visible ?? false;
     },
     resolveWebviewView(current) {
+      cancelSnapshot();
       view = current;
       current.webview.options = {
         enableScripts: true,
@@ -44,9 +61,7 @@ export function createSidebarProvider(
           const action = parseClientAction(value);
           if (!action) return;
           if (action.type === "ready") {
-            await current.webview.postMessage(
-              snapshotMessage(store.getSnapshot()),
-            );
+            if (view === current) await publishSnapshot();
             return;
           }
           try {
@@ -59,15 +74,27 @@ export function createSidebarProvider(
         }),
       );
       disposables.push(
+        current.onDidChangeVisibility(() => {
+          if (view !== current) return;
+          if (current.visible) void publishSnapshot();
+          else cancelSnapshot();
+        }),
         current.onDidDispose(() => {
-          if (view === current) view = undefined;
+          if (view === current) {
+            cancelSnapshot();
+            view = undefined;
+          }
         }),
       );
     },
     post(message) {
+      // Keep action acknowledgements after their state changes, as before
+      // batching (in particular editor revisions and attachment removal).
+      if (timer !== undefined) void publishSnapshot();
       if (view) void view.webview.postMessage(message);
     },
     dispose() {
+      cancelSnapshot();
       unsubscribe();
       for (const disposable of disposables) disposable.dispose();
       view = undefined;

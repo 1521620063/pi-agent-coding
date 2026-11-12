@@ -22,18 +22,33 @@ export class SessionStore {
     statuses: {},
     widgets: {},
   };
-  private listeners = new Set<(state: ViewState) => void>();
+  private listeners = new Map<
+    (state: ViewState) => void,
+    readonly (keyof ViewState)[] | undefined
+  >();
+  private changeListeners = new Set<
+    (changed: readonly (keyof ViewState)[]) => void
+  >();
   private activeMessage: number | undefined;
   getSnapshot(): ViewState {
     return structuredClone(this.state);
   }
-  subscribe(listener: (state: ViewState) => void): Unsubscribe {
-    this.listeners.add(listener);
+  subscribe(
+    listener: (state: ViewState) => void,
+    keys?: readonly (keyof ViewState)[],
+  ): Unsubscribe {
+    this.listeners.set(listener, keys);
     return () => this.listeners.delete(listener);
+  }
+  subscribeChanges(
+    listener: (changed: readonly (keyof ViewState)[]) => void,
+  ): Unsubscribe {
+    this.changeListeners.add(listener);
+    return () => this.changeListeners.delete(listener);
   }
   update(patch: Partial<ViewState>): void {
     Object.assign(this.state, patch);
-    this.emit();
+    this.emit(Object.keys(patch) as (keyof ViewState)[]);
   }
   replaceMessages(messages: AgentMessage[]): void {
     messages = messages.filter(validMessage);
@@ -66,22 +81,26 @@ export class SessionStore {
           result: { content: message.content, details: message.details },
           status: message.isError ? "error" : "success",
         });
-    this.emit();
+    this.emit(["messages", "tools"]);
   }
   apply(record: PiRecord): void {
     const state = this.state;
+    let changed: (keyof ViewState)[];
     switch (record.type) {
       case "agent_start":
         state.run = "running";
+        changed = ["run"];
         break;
       case "agent_settled":
         state.run = "idle";
         state.retry = { ...state.retry, active: false };
+        changed = ["run", "retry"];
         break;
       case "message_start":
         if (!validMessage(record.message)) return;
         this.activeMessage = state.messages.length;
         state.messages.push(structuredClone(record.message));
+        changed = ["messages"];
         break;
       case "message_update": {
         const event = record.assistantMessageEvent;
@@ -129,6 +148,7 @@ export class SessionStore {
         else if (event.type === "toolcall_end" && isObject(event.toolCall))
           message.content[index] = event.toolCall;
         if (record.usage) message.usage = record.usage;
+        changed = ["messages"];
         break;
       }
       case "message_end":
@@ -137,6 +157,7 @@ export class SessionStore {
           state.messages[this.activeMessage] = structuredClone(record.message);
         else state.messages.push(structuredClone(record.message));
         this.activeMessage = undefined;
+        changed = ["messages"];
         break;
       case "tool_execution_start":
       case "tool_execution_update":
@@ -162,6 +183,7 @@ export class SessionStore {
           tool.status = record.isError ? "error" : "success";
           tool.durationMs = record.durationMs;
         }
+        changed = ["tools"];
         break;
       }
       case "queue_update":
@@ -170,24 +192,30 @@ export class SessionStore {
             steering: record.steering,
             followUp: record.followUp,
           };
+        else return;
+        changed = ["queues"];
         break;
       case "session_info_changed":
-        if (state.session)
-          state.session.name =
-            typeof record.name === "string" ? record.name : undefined;
+        if (!state.session) return;
+        state.session.name =
+          typeof record.name === "string" ? record.name : undefined;
+        changed = ["session"];
         break;
       case "thinking_level_changed":
         state.thinkingLevel = record.level;
+        changed = ["thinkingLevel"];
         break;
       case "auto_retry_start":
       case "summarization_retry_scheduled":
       case "summarization_retry_attempt_start":
         state.run = "running";
         state.retry = { ...state.retry, ...record, active: true };
+        changed = ["run", "retry"];
         break;
       case "auto_retry_end":
       case "summarization_retry_finished":
         state.retry = { ...state.retry, ...record, active: false };
+        changed = ["retry"];
         break;
       case "compaction_start":
         state.compaction = {
@@ -196,6 +224,7 @@ export class SessionStore {
           reason: record.reason,
           error: undefined,
         };
+        changed = ["compaction"];
         break;
       case "compaction_end":
         state.compaction = {
@@ -206,18 +235,28 @@ export class SessionStore {
           aborted: record.aborted,
         };
         if (record.willRetry) state.run = "running";
+        changed = record.willRetry ? ["compaction", "run"] : ["compaction"];
         break;
       case "extension_error":
         state.error = String(record.error ?? "PI extension error");
+        changed = ["error"];
         break;
       default:
         return;
     }
-    this.emit();
+    this.emit(changed);
   }
-  private emit(): void {
-    const snapshot = this.getSnapshot();
-    for (const listener of this.listeners) listener(snapshot);
+  private emit(changed: readonly (keyof ViewState)[]): void {
+    if (!changed.length) return;
+    const listeners = [...this.listeners].filter(
+      ([, keys]) => !keys || keys.some((key) => changed.includes(key)),
+    );
+    if (listeners.length) {
+      const snapshot = this.getSnapshot();
+      for (const [listener] of listeners) listener(snapshot);
+    }
+    // Publish after synchronous subscribers have derived queue controls.
+    for (const listener of this.changeListeners) listener(changed);
   }
 }
 function strings(value: unknown): value is string[] {

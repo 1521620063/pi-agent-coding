@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { SessionStore } from "../../src/state/session-store";
 it("reconciles partial text and thinking with authoritative message_end", () => {
   const store = new SessionStore();
@@ -65,4 +65,47 @@ it("replaces queues and merges generic tool results without assuming tool names"
     name: "mcp_search",
     status: "error",
   });
+});
+
+it("keeps business subscriptions synchronous without cloning unrelated streaming content", () => {
+  const store = new SessionStore();
+  const observe = vi.fn();
+  store.subscribe(observe, ["connection", "run", "queues"]);
+  const snapshot = vi.spyOn(store, "getSnapshot");
+  for (let i = 0; i < 100; i++)
+    store.apply({
+      type: "message_update",
+      assistantMessageEvent: {
+        type: "text_delta",
+        contentIndex: 0,
+        delta: "字",
+      },
+    });
+  expect(observe).not.toHaveBeenCalled();
+  expect(snapshot).not.toHaveBeenCalled();
+  store.apply({ type: "agent_start" });
+  expect(observe).toHaveBeenLastCalledWith(
+    expect.objectContaining({ run: "running" }),
+  );
+  store.apply({ type: "queue_update", steering: [], followUp: ["queued"] });
+  expect(observe).toHaveBeenLastCalledWith(
+    expect.objectContaining({ queues: { steering: [], followUp: ["queued"] } }),
+  );
+  store.apply({ type: "agent_settled" });
+  expect(observe).toHaveBeenLastCalledWith(
+    expect.objectContaining({ run: "idle" }),
+  );
+});
+
+it("notifies snapshot-free observers and stops after unsubscribe", () => {
+  const store = new SessionStore();
+  const changed = vi.fn();
+  const stop = store.subscribeChanges(changed);
+  const snapshot = vi.spyOn(store, "getSnapshot");
+  store.update({ title: "new title" });
+  expect(changed).toHaveBeenCalledOnce();
+  expect(snapshot).not.toHaveBeenCalled();
+  stop();
+  store.update({ title: "later" });
+  expect(changed).toHaveBeenCalledOnce();
 });
