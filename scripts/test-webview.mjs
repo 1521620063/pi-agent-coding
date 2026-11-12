@@ -73,10 +73,14 @@ for (let attempt = 0; attempt < 20 && !server.listening; attempt++) {
     await new Promise((done, reject) => {
       const failed = (error) => reject(error);
       server.once("error", failed);
-      server.listen(49152 + Math.floor(Math.random() * 12000), "127.0.0.1", () => {
-        server.off("error", failed);
-        done();
-      });
+      server.listen(
+        49152 + Math.floor(Math.random() * 12000),
+        "127.0.0.1",
+        () => {
+          server.off("error", failed);
+          done();
+        },
+      );
     });
   } catch (error) {
     if (error.code !== "EADDRINUSE") throw error;
@@ -139,6 +143,44 @@ try {
   await page.locator("#model-name").filter({ hasText: "test" }).waitFor();
   const prompt = page.locator("#prompt textarea");
   assert.equal(await prompt.inputValue(), "保留草稿");
+  assert.equal(
+    await page.locator('[data-action="attachSelection"]').count(),
+    0,
+  );
+  assert.equal(await page.locator("#settings-panel").isVisible(), false);
+  await page.locator("#settings-toggle").click();
+  await page.locator("#settings-panel").waitFor();
+  await page.locator("#auto-retry [part=control]").click();
+  await page.waitForFunction(() => window.actions.at(-1)?.type === "autoRetry");
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "autoRetry",
+    enabled: true,
+  });
+  await page.locator("#steering-mode").click();
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("#settings-panel").isVisible(), true);
+  await page.locator("#steering-mode").click();
+  await page.locator('#steering-mode wa-option[value="all"]').click();
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "queueMode",
+    channel: "steering",
+    mode: "all",
+  });
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("#settings-panel").isVisible(), false);
+  assert.equal(
+    await page
+      .locator("#settings-toggle")
+      .evaluate((node) => node.matches(":focus-within")),
+    true,
+  );
+  assert.equal(await prompt.inputValue(), "保留草稿");
+  await page.locator("#settings-toggle").click();
+  await page.locator("#settings-close").click();
+  assert.equal(await page.locator("#settings-panel").isVisible(), false);
+  await page.locator("#settings-toggle").click();
+  await prompt.click();
+  assert.equal(await page.locator("#settings-panel").isVisible(), false);
   await prompt.fill("@");
   await page.locator("#command-menu [role=option]").first().waitFor();
   await prompt.press("ArrowDown");
@@ -270,6 +312,21 @@ try {
           [],
           `Clipped composer controls: ${theme} ${width} ${zoom}`,
         );
+        await page.locator("#settings-toggle").click();
+        await page.locator("#settings-panel").waitFor();
+        await page.screenshot({
+          path: join(artifacts, `settings-${theme}-${width}-${zoom}.png`),
+          fullPage: true,
+        });
+        const panelBounds = await page.locator("#settings-panel").boundingBox();
+        assert.ok(
+          panelBounds &&
+            panelBounds.x >= -1 &&
+            panelBounds.x + panelBounds.width <= width + 1,
+          `Settings panel overflow: ${theme} ${width} ${zoom}`,
+        );
+        await page.keyboard.press("Escape");
+        assert.equal(await page.locator("#settings-panel").isVisible(), false);
       }
   }
   assert.deepEqual(failures, []);

@@ -231,9 +231,9 @@ function renderState() {
   for (const id of ["model", "thinking", "auto-compaction", "auto-retry"])
     byId<FormButton | FormSwitch>(id).disabled =
       state.connection !== "connected";
-  byId("cwd").textContent = state.workspace ?? "打开本地工作区后连接";
-  byId("cwd").title = state.workspace ?? "";
-  byId("statuses").textContent = Object.values(state.statuses).join(" · ");
+  const statuses = Object.values(state.statuses).join(" · ");
+  byId("statuses").textContent = statuses;
+  byId("statuses").hidden = !statuses;
   const stats = state.stats;
   const tokens = stats?.tokens?.total;
   const cost = stats?.cost;

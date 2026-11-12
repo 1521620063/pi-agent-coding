@@ -31,6 +31,7 @@ wa-icon {
   flex-shrink: 0;
 }
 header {
+  position: relative;
   gap: 3px;
   padding: 8px 12px 8px 16px;
 }
@@ -94,7 +95,7 @@ footer {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
   padding: 5px 9px 9px;
 }
 .input-actions::after {
@@ -113,25 +114,47 @@ footer {
 .send-actions {
   margin-left: auto;
 }
+.attach-actions {
+  flex: 1 1 140px;
+  flex-wrap: nowrap;
+}
+#attach-files {
+  flex: 0 0 26px;
+}
+#attach-files::part(base) {
+  width: 26px;
+  min-height: 26px;
+  padding: 0;
+}
 .input-actions wa-button::part(base) {
   padding-inline: 7px;
 }
 #mode {
-  width: 108px;
+  width: calc(4em + 25px);
+  font-size: var(--pi-font-small);
   --wa-form-control-background-color: transparent;
   --wa-form-control-border-color: transparent;
-  --wa-form-control-padding-inline: 7px;
+  --wa-form-control-padding-inline: 4px;
   --wa-form-control-height: 30px;
   --wa-form-control-value-color: var(--pi-muted);
 }
 #mode::part(combobox) {
   box-shadow: none;
+  gap: 0;
+}
+#mode::part(expand-icon) {
+  width: 10px;
+  font-size: 10px;
+  margin-inline-start: 3px;
 }
 #mode:hover::part(combobox) {
   background: var(--pi-hover);
 }
 #mode::part(display-input) {
   font-size: var(--pi-font-small);
+  flex: 0 0 auto;
+  width: 4em;
+  padding: 0;
 }
 #mode::part(listbox) {
   padding: 5px;
@@ -142,11 +165,19 @@ footer {
 wa-option::part(label) {
   font-size: var(--pi-font-small);
 }
-#send::part(base) {
-  width: 31px;
-  min-height: 31px;
+.input-actions #send {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border-radius: 9px;
+  background: transparent;
+}
+#send::part(base) {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 7px;
   color: var(--pi-button-text);
   background: var(--pi-button);
   border-color: transparent;
@@ -156,12 +187,13 @@ wa-option::part(label) {
 }
 .composer-meta {
   display: flex;
-  flex-wrap: wrap;
+  flex: 0 1 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 2px;
-  margin: 0 10px;
-  padding: 5px 0;
-  border-top: 1px solid var(--pi-line);
+  margin: 0;
+  padding: 0;
 }
 .composer-meta wa-button {
   min-width: 0;
@@ -183,8 +215,8 @@ wa-option::part(label) {
   opacity: 0.7;
 }
 #model-menu {
-  flex: 1 1 110px;
-  max-width: 100%;
+  flex: 0 1 auto;
+  max-width: 200px;
   min-width: 0;
 }
 #model {
@@ -193,7 +225,7 @@ wa-option::part(label) {
 #model::part(base) {
   color: var(--pi-fg);
 }
-#thinking {
+#thinking-menu {
   flex-shrink: 0;
 }
 #model-menu::part(menu),
@@ -218,7 +250,8 @@ wa-option::part(label) {
 #history-popup::part(popup) {
   z-index: 100;
 }
-#history-panel {
+#history-panel,
+#settings-panel {
   width: min(340px, calc(100vw - 16px));
   max-width: var(--auto-size-available-width);
   max-height: min(420px, var(--auto-size-available-height, 65vh));
@@ -229,6 +262,17 @@ wa-option::part(label) {
   box-shadow: var(--pi-popup-shadow);
   padding: 6px;
   font-size: var(--pi-font-small);
+}
+#settings-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 8px;
+  z-index: 100;
+  width: min(340px, calc(100% - 16px));
+  max-width: calc(100% - 16px);
+}
+#settings-popup {
+  display: contents;
 }
 .history-heading {
   padding: 5px 8px;
@@ -296,15 +340,23 @@ wa-option::part(label) {
   font-size: var(--pi-font-compact);
   padding: 0 8px;
 }
-.preferences,
 #shell-panel {
   font-size: var(--pi-font-small);
 }
-.preferences {
-  padding: 6px 3px 0;
-  margin-top: 1px;
-  max-height: 32vh;
-  overflow: auto;
+.settings-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-inline: 6px;
+}
+.settings-heading strong {
+  font: inherit;
+  font-weight: 600;
+  color: var(--pi-fg);
+}
+#settings-panel wa-button::part(base) {
+  white-space: normal;
 }
 .settings-fields,
 .shell-fields {
@@ -397,6 +449,7 @@ wa-button.command-option::part(label) {
 @media (max-width: 350px) {
   header {
     padding-inline: 12px 8px;
+    flex-wrap: wrap;
   }
   footer {
     padding-inline: 8px;
@@ -407,10 +460,6 @@ wa-button.command-option::part(label) {
   }
   .input-actions wa-button::part(base) {
     padding-inline: 5px;
-  }
-  #mode {
-    width: 99px;
-    --wa-form-control-padding-inline: 4px;
   }
   #usage {
     width: 100%;
@@ -431,9 +480,6 @@ wa-button.command-option::part(label) {
   }
   .send-actions {
     margin-left: auto;
-  }
-  .composer-meta {
-    flex-wrap: wrap;
   }
   #model-menu {
     max-width: 100%;

@@ -3,7 +3,12 @@ import type { WaSelectEvent } from "@awesome.me/webawesome/dist/events/select.js
 import type WaPopup from "@awesome.me/webawesome/dist/components/popup/popup.js";
 import type WaDropdown from "@awesome.me/webawesome/dist/components/dropdown/dropdown.js";
 import type WaDropdownItem from "@awesome.me/webawesome/dist/components/dropdown-item/dropdown-item.js";
-import { formButton, type FormButton, type FormInput } from "./components";
+import {
+  formButton,
+  type FormButton,
+  type FormInput,
+  type FormSelect,
+} from "./components";
 
 export function setupSelections(
   root: HTMLElement,
@@ -16,6 +21,9 @@ export function setupSelections(
   const historyPopup = get<WaPopup>("history-popup");
   const panel = get("history-panel");
   const trigger = get<FormButton>("sessions");
+  const settingsPopup = get("settings-popup");
+  const settingsPanel = get("settings-panel");
+  const settingsTrigger = get<FormButton>("settings-toggle");
   let current: ViewState | undefined;
   let lastModels = "";
   let lastThinking = "";
@@ -38,10 +46,25 @@ export function setupSelections(
     modelMenu.open = false;
     thinkingMenu.open = false;
   };
+  const closeSettings = (restoreFocus = false) => {
+    settingsPanel.hidden = true;
+    settingsTrigger.setAttribute("aria-expanded", "false");
+    if (restoreFocus) settingsTrigger.focus();
+  };
+  settingsTrigger.onclick = () => {
+    if (!settingsPanel.hidden) return closeSettings();
+    closeHistory();
+    closeMenus();
+    settingsPanel.hidden = false;
+    settingsTrigger.setAttribute("aria-expanded", "true");
+    settingsPanel.focus();
+  };
+  get("settings-close").onclick = () => closeSettings(true);
   trigger.onclick = () => {
     if (current?.connection !== "connected") return;
     if (!panel.hidden) return closeHistory();
     closeMenus();
+    closeSettings();
     historyPopup.active = true;
     panel.hidden = false;
     trigger.setAttribute("aria-expanded", "true");
@@ -54,10 +77,35 @@ export function setupSelections(
   };
   document.addEventListener("pointerdown", (event) => {
     if (!event.composedPath().includes(historyPopup)) closeHistory();
+    if (!event.composedPath().includes(settingsPopup)) closeSettings();
   });
   document.addEventListener("focusin", (event) => {
     if (!event.composedPath().includes(historyPopup)) closeHistory();
+    if (!event.composedPath().includes(settingsPopup)) closeSettings();
   });
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (
+        event.key !== "Escape" ||
+        settingsPanel.hidden ||
+        event.defaultPrevented
+      )
+        return;
+      // Selects stop keydown propagation even when closed. Capture Escape here,
+      // but let an open select close its own options before dismissing the panel.
+      if (
+        Array.from(
+          settingsPanel.querySelectorAll<FormSelect>("wa-select"),
+        ).some((select) => select.open)
+      )
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeSettings(true);
+    },
+    { capture: true },
+  );
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !panel.hidden) {
       event.preventDefault();
@@ -67,6 +115,7 @@ export function setupSelections(
   for (const menu of [modelMenu, thinkingMenu]) {
     menu.addEventListener("wa-show", () => {
       closeHistory();
+      closeSettings();
       (menu === modelMenu ? thinkingMenu : modelMenu).open = false;
       post({ type: "refreshModels" });
     });

@@ -129,13 +129,6 @@ button:disabled {
   text-align: left;
   white-space: normal;
 }
-#cwd {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-  font-family: var(--vscode-editor-font-family, monospace);
-}
 .preferences {
   color: var(--pi-muted);
 }
@@ -618,10 +611,6 @@ textarea::placeholder {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
 }
-#cwd {
-  font-size: var(--pi-font-compact);
-  opacity: 0.8;
-}
 .preferences {
   padding: 4px 4px 0;
   margin-top: 4px;
@@ -805,9 +794,6 @@ input[type="checkbox"] {
   }
   .statusline {
     margin-top: 3px;
-  }
-  .statusline:has(#cwd) {
-    display: none;
   }
   #shell-panel {
     padding-top: 6px;
