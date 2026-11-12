@@ -2,14 +2,19 @@ import type { PiController } from "../pi/controller";
 import type { SlashCommand } from "../pi/protocol";
 import type { SessionStore } from "../state/session-store";
 export class CommandService {
+  private sequence = 0;
   constructor(
     private pi: Pick<PiController, "request">,
     private store: SessionStore,
   ) {}
   async refresh(): Promise<void> {
+    const revision = this.store.sessionRevision;
+    const sequence = ++this.sequence;
     const result = await this.pi.request<{ commands: SlashCommand[] }>({
       type: "get_commands",
     });
+    if (revision !== this.store.sessionRevision || sequence !== this.sequence)
+      return;
     if (!Array.isArray(result.commands))
       throw new Error("Incompatible PI command response");
     this.store.update({

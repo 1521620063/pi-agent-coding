@@ -228,7 +228,7 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
   )
     promotingRevision = undefined;
   selections.render(state);
-  if (state.error) {
+  if (state.error || state.connection !== "connected") {
     submitting = false;
     stoppingFromPrompt = false;
   }

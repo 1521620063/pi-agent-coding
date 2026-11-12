@@ -145,6 +145,31 @@ try {
   await page.locator("#model-name").filter({ hasText: "test" }).waitFor();
   const prompt = page.locator("#prompt textarea");
   assert.equal(await prompt.inputValue(), "保留草稿");
+  // A closed connection must release local send state without discarding the draft.
+  await prompt.fill("断开后保留的草稿");
+  await prompt.press("Enter");
+  assert.equal(
+    await page.locator("#send").evaluate((node) => node.disabled),
+    true,
+  );
+  await page.evaluate(() => {
+    window.deliver({
+      type: "snapshot",
+      state: { ...window.fixtureState, connection: "disconnected" },
+    });
+    window.deliver({ type: "snapshot", state: window.fixtureState });
+  });
+  assert.equal(await prompt.inputValue(), "断开后保留的草稿");
+  assert.equal(
+    await page.locator("#send").evaluate((node) => node.disabled),
+    false,
+  );
+  await prompt.press("Enter");
+  assert.equal(await page.evaluate(() => window.actions.at(-1).type), "send");
+  await page.evaluate(() =>
+    window.deliver({ type: "sent", attachmentIds: [] }),
+  );
+  await prompt.fill("保留草稿");
   // Usage is a keyboard-accessible shortcut to the existing host compact flow.
   const usage = page.locator("#usage");
   await usage.click();

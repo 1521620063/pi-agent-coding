@@ -103,8 +103,11 @@ export class SessionService {
     await this.refreshList();
   }
   async refresh(): Promise<void> {
+    const revision = this.store.sessionRevision;
     const state = await this.pi.request({ type: "get_state" });
+    if (revision !== this.store.sessionRevision) return;
     const result = await this.pi.request({ type: "get_messages" });
+    if (revision !== this.store.sessionRevision) return;
     if (typeof state.sessionId !== "string" || !Array.isArray(result.messages))
       throw new Error("Incompatible PI session response");
     this.store.replaceMessages(result.messages);
@@ -137,8 +140,8 @@ export class SessionService {
     });
     await this.remember();
   }
-  async create(): Promise<void> {
-    await this.change({ type: "new_session" });
+  async create(): Promise<boolean> {
+    return this.change({ type: "new_session" });
   }
   async restoreLast(): Promise<boolean> {
     const workspace = this.store.getSnapshot().workspace;
@@ -163,7 +166,9 @@ export class SessionService {
     await this.change({ type: "switch_session", sessionPath: ref.sessionPath });
   }
   async rename(name: string): Promise<void> {
+    const revision = this.store.sessionRevision;
     await this.pi.request({ type: "set_session_name", name });
+    if (revision !== this.store.sessionRevision) return;
     const state = this.store.getSnapshot();
     if (state.session)
       this.store.update({ session: { ...state.session, name } });

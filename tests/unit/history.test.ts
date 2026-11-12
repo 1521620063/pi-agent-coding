@@ -82,3 +82,20 @@ it("maps visible user messages to PI fork points and rejects mismatched branches
     "get_fork_messages",
   ]);
 });
+
+it("does not export another session selected while choosing the output file", async () => {
+  const store = new SessionStore();
+  store.update({ session: { id: "old" } });
+  const request = vi.fn(async () => ({ path: "export.html" }));
+  const history = new HistoryService(
+    { request, stopAll: async () => {} } as never,
+    store,
+    async () => {},
+    async () => {
+      store.update({ session: { id: "new" } });
+      return "export.html";
+    },
+  );
+  await expect(history.exportHtml()).rejects.toThrow(/会话/);
+  expect(request).not.toHaveBeenCalled();
+});

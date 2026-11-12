@@ -16,6 +16,8 @@ vi.mock("vscode", () => ({
 import { createActionHandler } from "../../src/host/actions";
 import { SessionStore } from "../../src/state/session-store";
 import { ActionGate } from "../../src/features/action-gate";
+import { SessionService } from "../../src/features/sessions";
+import { HistoryService } from "../../src/features/history";
 
 function fixture() {
   const store = new SessionStore();
@@ -249,4 +251,80 @@ it("locks /new as a session transition while preserving ordinary slash prompts",
     [],
     "followUp",
   );
+});
+
+it.each(["/new", "/fork", "/clone"])(
+  "preserves %s when PI cancels the operation",
+  async (text) => {
+    const f = fixture();
+    f.store.update({ session: { id: "old" } });
+    const pi = {
+      request: vi.fn(async (command: { type: string }) =>
+        command.type === "get_fork_messages"
+          ? { messages: [{ entryId: "one", text: "question" }] }
+          : { cancelled: true },
+      ),
+      stopAll: async () => {},
+    };
+    const sessions = new SessionService(pi as never, f.store, {
+      get: () => [],
+      update: async () => {},
+    });
+    const history = new HistoryService(pi as never, f.store, async () => {});
+    const handler = createActionHandler({
+      store: f.store,
+      gate: f.gate,
+      sessions,
+      history,
+      post: f.post,
+      models: f.models,
+      usage: f.usage,
+      commands: { refresh: async () => {} },
+    } as unknown as Parameters<typeof createActionHandler>[0]);
+    if (text === "/fork")
+      ui.pick.mockImplementationOnce(async (items) => items[0]);
+    await handler({ type: "send", text, attachmentIds: [], mode: "followUp" });
+    expect(f.post).toHaveBeenLastCalledWith({
+      type: "sent",
+      attachmentIds: [],
+      preserveDraft: true,
+    });
+    expect(f.store.getSnapshot().session?.id).toBe("old");
+  },
+);
+
+it.each(["renameSession", "compact"] as const)(
+  "does not apply %s to a session selected while its dialog is open",
+  async (type) => {
+    const f = fixture();
+    f.store.update({ session: { id: "old" } });
+    ui.input.mockImplementationOnce(async () => {
+      f.store.update({ session: { id: "new" } });
+      return "instructions or name";
+    });
+    const handler = createActionHandler({
+      store: f.store,
+      gate: f.gate,
+      sessions: f.sessions,
+      usage: f.usage,
+    } as unknown as Parameters<typeof createActionHandler>[0]);
+    await expect(handler({ type })).rejects.toThrow(/会话/);
+    expect(f.sessions.rename).not.toHaveBeenCalled();
+    expect(f.usage.compact).not.toHaveBeenCalled();
+  },
+);
+
+it("rechecks whether PI is idle after the compaction dialog closes", async () => {
+  const f = fixture();
+  ui.input.mockImplementationOnce(async () => {
+    f.store.update({ run: "running" });
+    return "keep filenames";
+  });
+  const handler = createActionHandler({
+    store: f.store,
+    gate: f.gate,
+    usage: f.usage,
+  } as unknown as Parameters<typeof createActionHandler>[0]);
+  await expect(handler({ type: "compact" })).rejects.toThrow(/等待/);
+  expect(f.usage.compact).not.toHaveBeenCalled();
 });

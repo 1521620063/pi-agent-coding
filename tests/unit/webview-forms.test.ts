@@ -37,6 +37,26 @@ beforeEach(() => {
   setState.mockClear();
 });
 
+it("allows sending again after disconnecting during an unacknowledged send", () => {
+  value("prompt", "保留待确认消息");
+  control("send").click();
+  expect(postMessage.mock.calls.at(-1)?.[0].type).toBe("send");
+  const state = new SessionStore().getSnapshot();
+  snapshot(state);
+  state.connection = "connected";
+  snapshot(state);
+  expect((control("prompt") as HTMLElement & { value: string }).value).toBe(
+    "保留待确认消息",
+  );
+  expect(
+    (control("send") as HTMLElement & { disabled: boolean }).disabled,
+  ).toBe(false);
+  control("send").click();
+  expect(
+    postMessage.mock.calls.filter(([action]) => action.type === "send"),
+  ).toHaveLength(2);
+});
+
 it("routes a Web Awesome menu selection once without forwarding unrelated values", () => {
   const menu = control("actions");
   const item = document.createElement("wa-dropdown-item");

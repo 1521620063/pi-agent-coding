@@ -30,6 +30,11 @@ export class SessionStore {
     (changed: readonly (keyof ViewState)[]) => void
   >();
   private activeMessage: number | undefined;
+  // An ID comparison alone misses reconnects and switching away and back.
+  private revision = 0;
+  get sessionRevision(): number {
+    return this.revision;
+  }
   getSnapshot(): ViewState {
     return structuredClone(this.state);
   }
@@ -47,6 +52,14 @@ export class SessionStore {
     return () => this.changeListeners.delete(listener);
   }
   update(patch: Partial<ViewState>): void {
+    if (
+      ("connection" in patch && patch.connection !== this.state.connection) ||
+      ("workspace" in patch && patch.workspace !== this.state.workspace) ||
+      ("session" in patch &&
+        (patch.session?.id !== this.state.session?.id ||
+          patch.session?.path !== this.state.session?.path))
+    )
+      this.revision++;
     Object.assign(this.state, patch);
     this.emit(Object.keys(patch) as (keyof ViewState)[]);
   }

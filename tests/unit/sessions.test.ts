@@ -54,3 +54,34 @@ it("publishes and removes only indexed history entries in the current workspace"
   expect(store.getSnapshot().session?.id).toBe("old");
   expect(pi.request).not.toHaveBeenCalled();
 });
+
+it("does not restore a disconnected session from a late message response", async () => {
+  const { store, sessions, pi } = setup();
+  store.update({ connection: "connected" });
+  pi.request.mockImplementation(async (command) => {
+    if (command.type === "get_state")
+      return {
+        sessionId: "new",
+        sessionFile: "new.jsonl",
+        thinkingLevel: "low",
+      };
+    store.update({ connection: "disconnected" });
+    return { messages: [{ role: "user", content: "late" }] };
+  });
+  await sessions.refresh();
+  expect(store.getSnapshot().session?.id).toBe("old");
+  expect(store.getSnapshot().messages[0].content).toBe("old");
+  expect(await sessions.list("file:///C:/work")).toEqual([]);
+});
+
+it("does not rename a new session with an old request result", async () => {
+  const { store, sessions, pi } = setup();
+  pi.request.mockImplementation(async () => {
+    store.update({
+      session: { id: "new", path: "new.jsonl", name: "new name" },
+    });
+    return { cancelled: false };
+  });
+  await sessions.rename("old name");
+  expect(store.getSnapshot().session?.name).toBe("new name");
+});

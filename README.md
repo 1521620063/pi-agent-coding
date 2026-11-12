@@ -4,7 +4,7 @@
 
 插件通过 `pi --mode rpc` 桥接本机 PI：界面与编辑器上下文由插件提供，推理、模型、工具、技能和会话仍由 PI 管理。交互组织参考 Codex / Claude Code 的侧栏方式，视觉优先参考 PI 自身的文本布局、消息配色和紧凑状态栏，并适配 VS Code 主题。
 
-当前版本为 **1.0.1（正式版）**，扩展标识为 `SilasPaul.pi-agent-coding`。验证基线为 **Windows + PI 1.5.2**；首次上架完成前可通过 VSIX 安装。具体变更见 [更新记录](CHANGELOG.md)。
+当前版本为 **1.0.2（正式版）**，扩展标识为 `SilasPaul.pi-agent-coding`。验证基线为 **Windows + PI 1.5.2**；首次上架完成前可通过 VSIX 安装。具体变更见 [更新记录](CHANGELOG.md)。
 
 验收范围：当前仅验证 Windows 本地环境；真实模型生成、真实 MCP / 扩展交互和长会话成功压缩尚未完成端到端验收。模拟进程、浏览器夹具和扩展宿主测试不代表这些真实环境已经通过。完整说明见“范围与限制”。
 
@@ -87,7 +87,7 @@ PI 运行时显示点阵动画与 `Working`，结束后自动移除；启用系�
 
 上架后，可在扩展视图中搜索 `@id:SilasPaul.pi-agent-coding`，核对发布者为 **SilasPaul** 后安装；也可通过命令 `code --install-extension SilasPaul.pi-agent-coding` 安装。首次上架前请使用下面的 VSIX 方式。
 
-打开 VS Code 命令面板（Windows：`Ctrl+Shift+P`），运行 **Extensions: Install from VSIX…**，选择 `pi-agent-coding-1.0.1.vsix`。
+打开 VS Code 命令面板（Windows：`Ctrl+Shift+P`），运行 **Extensions: Install from VSIX…**，选择 `pi-agent-coding-1.0.2.vsix`。
 
 如果从源码开始，在仓库根目录执行以下命令生成安装包：
 
@@ -99,7 +99,7 @@ npm run package
 安装包生成于仓库根目录，文件名随 `package.json` 中的版本变化。也可以用 VS Code CLI 安装已生成的包：
 
 ```powershell
-code --install-extension .\pi-agent-coding-1.0.1.vsix
+code --install-extension .\pi-agent-coding-1.0.2.vsix
 ```
 
 ### 3. 连接 PI
@@ -206,6 +206,8 @@ PI 默认注册在右侧辅助侧边栏，可与左侧文件资源管理器同�
 
 隐藏侧栏不会停止 PI 的当前任务。通过 **⋯ → 断开** 或关闭扩展会清理插件创建的 PI 进程；异常断开后需主动重新连接，插件不会自动重放上次消息。
 
+发送尚未确认时断开会保留输入草稿，重新连接后可自行检查对话并决定是否再次发送。重命名、压缩和导出对话框打开期间若切换会话或重新连接，插件会提示重新操作，避免操作落到其他会话；旧连接或旧会话的延迟刷新结果不会覆盖当前数据。PI 取消新建、分叉或复制时，相关快捷命令也会保留在输入框。
+
 ## 常用命令
 
 | 命令面板名称         | 命令 ID              | 用途                         |
@@ -275,6 +277,8 @@ npm run compile
 `test:vscode` 使用隔离的测试配置、扩展目录和临时工作区；Windows 下优先使用本机 VS Code，也可通过 `PI_TEST_VSCODE` 指定可执行文件。没有可用本机路径时，测试工具可能下载 VS Code。测试宿主中的模拟 PI 通过不代表真实模型或 MCP 验收通过。
 
 `test:webview` 使用现有 Playwright Core，本机 Windows 优先查找 Edge / Chrome，也可通过 `PI_TEST_BROWSER` 指定浏览器路径。截图输出到系统临时目录，属于浏览器夹具，不是原生 VS Code 截图。自动测试覆盖单元行为、模拟进程和原生 VS Code API；真实模型生成、真实扩展交互及完整历史数据尚未端到端验收。
+
+2026-11-12 另在专用临时目录完成真实 PI 1.5.2 的基础 RPC 冒烟验证：连接、会话读取与新建、模型与思考强度发现、命令发现、统计、重命名、Bash、历史树与分叉点查询、停止，以及空会话导出拒绝和无需压缩提示。该验证关闭扩展、MCP、技能与模板发现，使用离线启动模式，未调用模型，不代表真实生成、扩展交互或长会话成功压缩已通过。
 
 `npm run package` 和 VS Code 发布前钩子会先执行 `validate`，任一检查失败即停止。构建会根据依赖生成 `THIRD_PARTY_NOTICES.txt` 并随包分发，缺少依赖许可全文时会报错。VS Code 宿主和浏览器测试需在发布前另行运行。安装包不会随源码构建自动更新，需运行 `npm run package` 重新生成 VSIX。
 

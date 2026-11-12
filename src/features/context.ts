@@ -7,7 +7,9 @@ export class RetryService {
     private store: SessionStore,
   ) {}
   async setEnabled(enabled: boolean): Promise<void> {
+    const revision = this.store.sessionRevision;
     await this.pi.request({ type: "set_auto_retry", enabled });
+    if (revision !== this.store.sessionRevision) return;
     this.store.update({
       retry: { ...this.store.getSnapshot().retry, enabled },
     });
@@ -23,19 +25,16 @@ export class ContextService {
     private store: SessionStore,
   ) {}
   async refreshStats(): Promise<void> {
-    const id = this.store.getSnapshot().session?.id;
+    const revision = this.store.sessionRevision;
     const sequence = ++this.sequence;
     const stats = await this.pi.request<SessionStats>({
       type: "get_session_stats",
     });
-    if (
-      this.store.getSnapshot().session?.id === id &&
-      sequence === this.sequence
-    )
+    if (this.store.sessionRevision === revision && sequence === this.sequence)
       this.store.update({ stats });
   }
   async compact(customInstructions?: string): Promise<void> {
-    const id = this.store.getSnapshot().session?.id;
+    const revision = this.store.sessionRevision;
     this.store.update({
       compaction: {
         ...this.store.getSnapshot().compaction,
@@ -50,7 +49,7 @@ export class ContextService {
         { type: "compact", customInstructions },
         { timeoutMs: 0 },
       );
-      if (this.store.getSnapshot().session?.id === id) {
+      if (this.store.sessionRevision === revision) {
         this.store.update({
           compaction: {
             ...this.store.getSnapshot().compaction,
@@ -64,7 +63,7 @@ export class ContextService {
       // PI may decline a short session; this is not a failed connection or generation.
       const message = error instanceof Error ? error.message : String(error);
       if (/(?:^|: )Nothing to compact \(session too small\)$/.test(message)) {
-        if (this.store.getSnapshot().session?.id === id)
+        if (this.store.sessionRevision === revision)
           this.store.update({
             compaction: {
               ...this.store.getSnapshot().compaction,
@@ -76,7 +75,7 @@ export class ContextService {
           });
         return;
       }
-      if (this.store.getSnapshot().session?.id === id)
+      if (this.store.sessionRevision === revision)
         this.store.update({
           compaction: {
             ...this.store.getSnapshot().compaction,
@@ -88,7 +87,9 @@ export class ContextService {
     }
   }
   async setAutoCompaction(enabled: boolean): Promise<void> {
+    const revision = this.store.sessionRevision;
     await this.pi.request({ type: "set_auto_compaction", enabled });
+    if (revision !== this.store.sessionRevision) return;
     this.store.update({
       compaction: { ...this.store.getSnapshot().compaction, enabled },
     });

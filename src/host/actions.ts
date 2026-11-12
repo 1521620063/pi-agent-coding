@@ -335,7 +335,8 @@ export function createActionHandler({
       if (action.type === "openLink")
         await vscode.env.openExternal(vscode.Uri.parse(action.url));
       if (action.type === "newSession" || action.type === "openSession") {
-        if (action.type === "newSession") await sessions.create();
+        if (action.type === "newSession")
+          cancelled = (await sessions.create()) === false;
         else await sessions.openFromPicker();
         await Promise.all([
           models.refresh(),
@@ -344,14 +345,18 @@ export function createActionHandler({
         ]);
       }
       if (action.type === "renameSession") {
+        const revision = store.sessionRevision;
         const name =
           builtin?.args ||
           (await vscode.window.showInputBox({
             title: "PI 会话名称",
             value: store.getSnapshot().session?.name,
           }));
-        if (name !== undefined) await sessions.rename(name);
-        else cancelled = true;
+        if (name !== undefined) {
+          if (revision !== store.sessionRevision)
+            throw new Error("会话已切换或连接已改变，请重新命名。");
+          await sessions.rename(name);
+        } else cancelled = true;
       }
       if (action.type === "sessions") await sessions.refreshList();
       if (action.type === "removeSession")
@@ -381,14 +386,27 @@ export function createActionHandler({
       if (action.type === "autoCompaction")
         await usage.setAutoCompaction(action.enabled);
       if (action.type === "compact") {
+        const revision = store.sessionRevision;
         const instructions = builtin
           ? builtin.args
           : await vscode.window.showInputBox({
               title: "压缩上下文",
               prompt: "可选：需要在摘要中保留什么？留空使用 PI 默认策略。",
             });
-        if (instructions !== undefined)
+        if (instructions !== undefined) {
+          if (revision !== store.sessionRevision)
+            throw new Error("会话已切换或连接已改变，请重新压缩。");
+          const state = store.getSnapshot();
+          if (state.connection !== "connected")
+            throw new Error("请先连接 PI 再压缩上下文。");
+          if (
+            state.run !== "idle" ||
+            state.compaction.active ||
+            state.queueControl?.busy
+          )
+            throw new Error("请等待当前任务或压缩完成后再压缩上下文。");
           await usage.compact(instructions || undefined);
+        }
       }
       if (action.type === "fork") {
         const points = await history.listForkPoints();
@@ -399,10 +417,13 @@ export function createActionHandler({
           })),
           { title: "从用户消息分叉 · 不回滚文件" },
         );
-        if (pick) await history.fork(pick.point.entryId);
+        if (pick)
+          cancelled =
+            (await history.fork(pick.point.entryId))?.cancelled === true;
         else cancelled = true;
       }
-      if (action.type === "clone") await history.clone();
+      if (action.type === "clone")
+        cancelled = (await history.clone()) === false;
       if (action.type === "export") {
         const path = await history.exportHtml();
         if (path)

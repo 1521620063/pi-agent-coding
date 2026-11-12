@@ -122,17 +122,21 @@ export class HistoryService {
     }
     return result;
   }
-  async clone(): Promise<void> {
+  async clone(): Promise<boolean> {
     await this.idle();
     const result = await this.pi.request({ type: "clone" }, { timeoutMs: 0 });
     if (!result.cancelled) await this.refresh();
+    return !result.cancelled;
   }
   async getTree(): Promise<any> {
     return this.pi.request({ type: "get_tree" });
   }
   async exportHtml(): Promise<string | undefined> {
+    const revision = this.store.sessionRevision;
     const outputPath = await this.savePicker?.();
     if (!outputPath) return;
+    if (revision !== this.store.sessionRevision)
+      throw new Error("会话已切换或连接已改变，请重新导出。");
     const result = await this.pi.request(
       { type: "export_html", outputPath },
       { timeoutMs: 0 },
