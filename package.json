@@ -4,7 +4,7 @@
   "description": "A native-feeling VS Code sidebar for your locally installed PI coding agent.",
   "version": "1.0.0",
   "publisher": "SilasPaul",
-  "preview": true,
+  "preview": false,
   "license": "MIT",
   "icon": "media/icon.png",
   "galleryBanner": {
