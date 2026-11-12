@@ -1,6 +1,6 @@
 {
-  "name": "pi-sidebar",
-  "displayName": "PI",
+  "name": "pi-agent-coding",
+  "displayName": "PI Agent Coding",
   "description": "A native-feeling VS Code sidebar for your locally installed PI coding agent.",
   "version": "1.0.0",
   "publisher": "SilasPaul",

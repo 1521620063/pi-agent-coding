@@ -70,13 +70,13 @@ beforeEach(() => {
     nodePath: process.execPath,
   };
   context = {
-    extension: { id: "SilasPaul.pi-sidebar" },
+    extension: { id: "SilasPaul.pi-agent-coding" },
     subscriptions: [],
     workspaceState: { get: () => undefined, update: async () => {} },
   } as unknown as vscode.ExtensionContext;
 });
 
-it.each(["SilasPaul.pi-sidebar", "other-publisher.pi-sidebar"])(
+it.each(["SilasPaul.pi-agent-coding", "other-publisher.pi-agent-coding"])(
   "opens settings for the running extension %s",
   async (id) => {
     host.folders = [];
