@@ -109,16 +109,17 @@ export class HistoryService {
       { type: "fork", entryId },
       { timeoutMs: 0 },
     );
+    this.points = [];
     if (!result.cancelled) {
-      await this.refresh();
       this.store.update({
         editorText: {
           text: result.text ?? "",
           revision: (this.store.getSnapshot().editorText?.revision ?? 0) + 1,
+          focus: true,
         },
       });
+      await this.refresh();
     }
-    this.points = [];
     return result;
   }
   async clone(): Promise<void> {

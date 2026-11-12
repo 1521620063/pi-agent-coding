@@ -143,6 +143,64 @@ try {
   await page.locator("#model-name").filter({ hasText: "test" }).waitFor();
   const prompt = page.locator("#prompt textarea");
   assert.equal(await prompt.inputValue(), "保留草稿");
+  // Forking the first prompt leaves an empty branch but must keep the editor usable.
+  await page.locator('[data-message-index="0"]').click();
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "forkMessage",
+    index: 0,
+  });
+  await page.evaluate(() => {
+    window.beforeFork = window.fixtureState;
+    window.fixtureState = {
+      ...window.fixtureState,
+      messages: [],
+      tools: [],
+      editorText: { text: "你好", revision: 1, focus: true },
+    };
+    window.deliver({ type: "snapshot", state: window.fixtureState });
+  });
+  assert.equal(await prompt.inputValue(), "你好");
+  assert.equal(await page.locator(".assistant-message").count(), 0);
+  const editorBounds = await prompt.boundingBox();
+  assert.ok(
+    editorBounds &&
+      editorBounds.y >= 0 &&
+      editorBounds.y + editorBounds.height <= 1000,
+    `Fork editor outside viewport: ${JSON.stringify(editorBounds)}`,
+  );
+  assert.equal(
+    await prompt.evaluate((node) => node === node.getRootNode().activeElement),
+    true,
+    "Fork must focus the restored prompt",
+  );
+  await page.screenshot({
+    path: join(artifacts, "fork-editor.png"),
+    fullPage: true,
+  });
+  await prompt.fill("修改后的问题");
+  await page.locator(".conversation-search > summary").click();
+  await page.locator("#conversation-search input").focus();
+  await page.evaluate(() =>
+    window.deliver({ type: "snapshot", state: window.fixtureState }),
+  );
+  assert.equal(
+    await prompt.inputValue(),
+    "修改后的问题",
+    "Repeated snapshots must not overwrite the edited fork draft",
+  );
+  assert.equal(
+    await page
+      .locator("#conversation-search input")
+      .evaluate((node) => node === node.getRootNode().activeElement),
+    true,
+    "An applied editor revision must not steal focus again",
+  );
+  await page.locator(".conversation-search > summary").click();
+  await page.evaluate(() => {
+    window.fixtureState = window.beforeFork;
+    window.deliver({ type: "snapshot", state: window.fixtureState });
+  });
+  await prompt.fill("保留草稿");
   assert.equal(
     await page.locator("#mode").count(),
     0,
@@ -566,6 +624,47 @@ try {
             .locator(`#${menu} [part="menu"]`)
             .waitFor({ state: "hidden" });
         }
+        await page.evaluate(() => {
+          window.beforeFork = window.fixtureState;
+          window.deliver({
+            type: "snapshot",
+            state: {
+              ...window.fixtureState,
+              run: "idle",
+              messages: [],
+              tools: [],
+              queues: { steering: [], followUp: [] },
+              editorText: {
+                text: "你好",
+                focus: true,
+                revision: (window.forkRevision =
+                  (window.forkRevision ?? 1) + 1),
+              },
+            },
+          });
+        });
+        assert.equal(await prompt.inputValue(), "你好");
+        const forkBounds = await prompt.boundingBox();
+        assert.ok(
+          forkBounds &&
+            forkBounds.y >= -1 &&
+            forkBounds.y + forkBounds.height <= 1001,
+          `Fork prompt clipped: ${theme} ${width} ${zoom}: ${JSON.stringify(forkBounds)}`,
+        );
+        assert.equal(
+          await prompt.evaluate(
+            (node) => node === node.getRootNode().activeElement,
+          ),
+          true,
+        );
+        await page.screenshot({
+          path: join(artifacts, `fork-${theme}-${width}-${zoom}.png`),
+          fullPage: true,
+        });
+        await page.evaluate(() => {
+          window.deliver({ type: "snapshot", state: window.beforeFork });
+          window.scrollTo(0, 0);
+        });
       }
   }
   assert.deepEqual(failures, []);

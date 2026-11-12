@@ -62,7 +62,12 @@ export interface ViewState {
   retry: JsonObject;
   statuses: Record<string, string>;
   widgets: Record<string, { lines: string[]; placement: string }>;
-  editorText?: { text: string; revision: number; append?: boolean };
+  editorText?: {
+    text: string;
+    revision: number;
+    append?: boolean;
+    focus?: boolean;
+  };
   title?: string;
   shell?: JsonObject;
 }

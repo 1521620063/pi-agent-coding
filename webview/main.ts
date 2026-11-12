@@ -205,6 +205,10 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
       : state.editorText.text;
     saveDraft();
     renderCommands();
+    if (state.editorText.focus) {
+      prompt.focus({ preventScroll: true });
+      prompt.scrollIntoView({ block: "nearest" });
+    }
   }
 });
 function renderState() {

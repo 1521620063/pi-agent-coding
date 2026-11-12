@@ -36,6 +36,26 @@ it("does not export when the save dialog is cancelled or refresh after cancelled
   expect(refresh).not.toHaveBeenCalled();
 });
 
+it("restores the selected prompt even if refreshing the forked session fails", async () => {
+  const store = new SessionStore();
+  const history = new HistoryService(
+    {
+      request: async (command: any) =>
+        command.type === "get_fork_messages"
+          ? { messages: [{ entryId: "point", text: "original question" }] }
+          : { cancelled: false, text: "original question" },
+      stopAll: async () => {},
+    } as any,
+    store,
+    async () => {
+      throw new Error("model refresh failed");
+    },
+  );
+  await history.listForkPoints();
+  await expect(history.fork("point")).rejects.toThrow("model refresh failed");
+  expect(store.getSnapshot().editorText?.text).toBe("original question");
+});
+
 it("maps visible user messages to PI fork points and rejects mismatched branches", async () => {
   const store = new SessionStore();
   store.replaceMessages([{ role: "user", content: "old prompt" }]);
