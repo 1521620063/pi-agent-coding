@@ -4,10 +4,37 @@ import type { AgentMessage, JsonObject } from "../src/pi/protocol";
 import type { ToolView, ViewState } from "../src/shared/bridge";
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
 const original = md.validateLink.bind(md);
-md.validateLink = (url) => /^https?:/i.test(url) && original(url);
+const localReference = (url: string) =>
+  !!url &&
+  !/[\u0000-\u001f]/.test(url) &&
+  !/^(?:command|javascript|data|file|https?|vscode):/i.test(url) &&
+  (!/^(?![A-Za-z]:[\\/])[A-Za-z][\w+.-]*:/.test(url) ||
+    /^[^:/\\]+:\d+(?::\d+)?$/.test(url)) &&
+  !url.startsWith("//") &&
+  !url.startsWith("#");
+md.validateLink = (url) =>
+  (/^https?:/i.test(url) && original(url)) || localReference(url);
+const defaultLink =
+  md.renderer.rules.link_open ??
+  ((tokens, index, options, _env, self) =>
+    self.renderToken(tokens, index, options));
+md.renderer.rules.link_open = (tokens, index, options, env, self) => {
+  const href = String(tokens[index].attrGet("href") ?? "");
+  if (!/^https?:/i.test(href) && localReference(href)) {
+    let reference = href;
+    try {
+      reference = decodeURI(href);
+    } catch {
+      /* preserve invalid escape for host validation */
+    }
+    tokens[index].attrSet("data-reference", reference);
+    tokens[index].attrSet("href", "#");
+  }
+  return defaultLink(tokens, index, options, env, self);
+};
 export function renderMarkdown(text: string): string {
   return DOMPurify.sanitize(md.render(text), {
-    ALLOWED_URI_REGEXP: /^https?:\/\//i,
+    ALLOWED_URI_REGEXP: /^(?:https?:\/\/|#$)/i,
     FORBID_TAGS: ["style", "script", "iframe", "form", "input"],
     FORBID_ATTR: ["style"],
   });
@@ -29,7 +56,11 @@ export function element<K extends keyof HTMLElementTagNameMap>(
   if (text !== undefined) node.textContent = text;
   return node;
 }
-export function renderChat(container: HTMLElement, state: ViewState) {
+export function renderChat(
+  container: HTMLElement,
+  state: ViewState,
+  query = "",
+) {
   const nearBottom =
     container.scrollHeight - container.scrollTop - container.clientHeight < 70;
   const opened = new Set(
@@ -43,17 +74,44 @@ export function renderChat(container: HTMLElement, state: ViewState) {
   const shown = new Set<string>();
   for (const [index, message] of state.messages.entries()) {
     if (message.role === "toolResult") continue;
+    const text =
+      typeof message.content === "string"
+        ? message.content
+        : message.content
+            .filter((block) => block?.type === "text")
+            .map((block) => block.text ?? "")
+            .join("\n");
+    if (query && !text.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+      continue;
     const node = element(
       "article",
       message.role === "user" ? "user-message" : "assistant-message",
     );
     renderContent(node, message, index, state.tools, shown);
+    const actions = element("div", "content-actions");
+    if (message.role === "assistant" && text) {
+      const copy = contentButton("复制回复");
+      copy.dataset.copyText = text;
+      actions.append(copy);
+    }
+    if (message.role === "user") {
+      const edit = contentButton("修改后重新提问");
+      edit.title = "从此消息分叉并恢复到输入框，不回滚文件";
+      edit.dataset.messageIndex = String(index);
+      edit.disabled = state.connection !== "connected";
+      actions.append(edit);
+    }
+    node.append(actions);
     fragment.append(node);
     if (message.errorMessage)
       node.append(element("pre", "error", message.errorMessage));
   }
   for (const tool of state.tools)
-    if (!shown.has(tool.id)) fragment.append(renderTool(tool));
+    if (!query && !shown.has(tool.id)) fragment.append(renderTool(tool));
+  if (query && !fragment.childNodes.length)
+    fragment.append(
+      element("p", "muted", "当前可见对话没有匹配消息；可搜索 PI 完整历史。"),
+    );
   if (!state.messages.length) {
     const empty = element("div", "empty");
     empty.append(
@@ -105,7 +163,26 @@ function renderContent(
 function appendText(node: HTMLElement, text: string) {
   const body = element("div", "markdown");
   body.innerHTML = renderMarkdown(text);
+  for (const pre of body.querySelectorAll("pre")) {
+    const code = pre.querySelector("code");
+    if (!code) continue;
+    const controls = element("div", "content-actions");
+    const copy = contentButton("复制代码");
+    copy.dataset.copyText = code.textContent ?? "";
+    const open = contentButton("在编辑器打开");
+    open.dataset.codeText = code.textContent ?? "";
+    open.dataset.language = (
+      code.className.match(/language-([\w+-]+)/)?.[1] ?? ""
+    ).slice(0, 80);
+    controls.append(copy, open);
+    pre.after(controls);
+  }
   node.append(body);
+}
+function contentButton(label: string): HTMLButtonElement {
+  const button = element("button", "content-action", label);
+  button.type = "button";
+  return button;
 }
 function appendImage(node: HTMLElement, block: JsonObject) {
   if (
@@ -129,6 +206,11 @@ export function renderTool(tool: ToolView) {
     element("summary", "", label),
     element("pre", "tool-args", JSON.stringify(tool.args, null, 2)),
   );
+  if (typeof tool.args.path === "string") {
+    const open = contentButton("打开文件");
+    open.dataset.reference = tool.args.path;
+    details.append(open);
+  }
   for (const block of tool.result?.content ?? []) {
     if (block.type === "text") {
       const text = String(block.text ?? "");

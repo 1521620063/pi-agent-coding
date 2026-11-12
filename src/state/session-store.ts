@@ -39,6 +39,18 @@ export class SessionStore {
     this.activeMessage = undefined;
     this.state.messages = structuredClone(messages);
     this.state.tools = [];
+    const calls = new Map(
+      messages.flatMap((message) =>
+        Array.isArray(message.content)
+          ? message.content
+              .filter(
+                (block) =>
+                  block?.type === "toolCall" && typeof block.id === "string",
+              )
+              .map((block) => [block.id, block] as const)
+          : [],
+      ),
+    );
     for (const message of messages)
       if (
         message.role === "toolResult" &&
@@ -47,7 +59,9 @@ export class SessionStore {
         this.state.tools.push({
           id: message.toolCallId,
           name: message.toolName ?? "tool",
-          args: {},
+          args: isObject(calls.get(message.toolCallId)?.arguments)
+            ? calls.get(message.toolCallId)!.arguments
+            : {},
           result: { content: message.content, details: message.details },
           status: message.isError ? "error" : "success",
         });

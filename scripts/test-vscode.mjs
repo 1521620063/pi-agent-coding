@@ -15,6 +15,19 @@ await build({
   external: ["vscode", "mocha"],
 });
 const workspace = await mkdtemp(join(tmpdir(), "pi-vscode-test-"));
+const userData = await mkdtemp(join(tmpdir(), "pi-vscode-user-"));
+await mkdir(join(userData, "User"));
+// PI paths are machine-scoped and VS Code ignores them in workspace settings.
+// Put the fake launcher in this run's isolated user profile.
+await writeFile(
+  join(userData, "User", "settings.json"),
+  JSON.stringify({
+    "pi.executablePath": resolve("tests/fixtures/fake-pi.mjs"),
+    "pi.nodePath": process.execPath,
+    "workbench.startupEditor": "none",
+    "window.restoreWindows": "none",
+  }),
+);
 await mkdir(join(workspace, ".vscode"));
 await writeFile(
   join(workspace, ".vscode/settings.json"),
@@ -53,11 +66,7 @@ await runTests({
     "--skip-welcome",
     "--skip-release-notes",
     "--user-data-dir",
-    resolve(
-      process.env.PI_TEST_EXTENSION_DIR
-        ? ".vscode-test/package-user-data"
-        : ".vscode-test/user-data",
-    ),
+    userData,
     "--extensions-dir",
     resolve(
       process.env.PI_TEST_EXTENSION_DIR

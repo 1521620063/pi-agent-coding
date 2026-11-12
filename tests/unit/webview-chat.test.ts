@@ -21,3 +21,17 @@ it("renders code and strips executable HTML and command links", () => {
   expect(node.querySelector('[href^="command:"]')).toBeNull();
   expect(node.querySelector("code")?.textContent).toContain("console.log");
 });
+it("routes file references through the host without enabling file or command URLs", () => {
+  const node = document.createElement("div");
+  node.innerHTML = renderMarkdown(
+    "[source](src/main.ts#L12) [bad](file:///secret) [bad](command:evil)",
+  );
+  expect(
+    node.querySelector("a[data-reference]")?.getAttribute("data-reference"),
+  ).toBe("src/main.ts#L12");
+  expect(node.querySelector("a[data-reference]")?.getAttribute("href")).toBe(
+    "#",
+  );
+  expect(node.querySelector('[href^="file:"]')).toBeNull();
+  expect(node.querySelector('[href^="command:"]')).toBeNull();
+});

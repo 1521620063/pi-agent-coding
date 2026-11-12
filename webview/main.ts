@@ -14,11 +14,13 @@ import {
 } from "./components";
 import { moreActions, sidebarMarkup } from "./layout";
 import { setupSelections } from "./selections";
+import { PromptHistory, setupComposer } from "./composer";
 import type { WaSelectEvent } from "@awesome.me/webawesome/dist/events/select.js";
 import "./forms.css";
 declare function acquireVsCodeApi(): {
   postMessage(message: ClientAction): void;
-  getState(): { draft?: string; editorRevision?: number } | undefined;
+  getState():
+    { draft?: string; editorRevision?: number; history?: string[] } | undefined;
   setState(state: unknown): void;
 };
 const vscode = acquireVsCodeApi();
@@ -37,6 +39,37 @@ let submitting = false;
 let submittedText = "";
 let editorRevision = restored?.editorRevision ?? 0;
 let composing = false;
+const inputHistory = new PromptHistory(restored?.history);
+function saveDraft() {
+  vscode.setState({
+    draft: promptText(),
+    editorRevision,
+    ...(inputHistory.entries.length ? { history: inputHistory.entries } : {}),
+  });
+}
+const composer = setupComposer(
+  prompt,
+  byId("command-menu"),
+  post,
+  () => state?.commands ?? [],
+  saveDraft,
+  inputHistory,
+);
+byId<FormInput>("conversation-search").addEventListener("input", () => {
+  if (state)
+    renderChat(
+      byId("transcript"),
+      state,
+      byId<FormInput>("conversation-search").value ?? "",
+    );
+});
+for (const channel of ["steering", "followUp"] as const) {
+  byId<FormSelect>(`${channel}-mode`).addEventListener("change", () => {
+    const mode = byId<FormSelect>(`${channel}-mode`).value;
+    if (mode === "all" || mode === "one-at-a-time")
+      post({ type: "queueMode", channel, mode });
+  });
+}
 for (const button of root.querySelectorAll<FormButton>("[data-action]"))
   button.onclick = () => post({ type: button.dataset.action } as ClientAction);
 byId("actions").addEventListener("wa-select", (event) => {
@@ -52,8 +85,11 @@ prompt.addEventListener("compositionstart", () => {
 });
 prompt.addEventListener("compositionend", () => {
   composing = false;
+  composer.refresh();
 });
 prompt.addEventListener("keydown", (event) => {
+  if (composing || event.isComposing) return;
+  if (composer.keydown(event)) return;
   if (
     shouldSend({
       key: event.key,
@@ -66,8 +102,12 @@ prompt.addEventListener("keydown", (event) => {
   }
 });
 prompt.addEventListener("input", () => {
-  vscode.setState({ draft: promptText(), editorRevision });
-  renderCommands();
+  inputHistory.reset();
+  saveDraft();
+  if (!composing) composer.refresh();
+});
+prompt.addEventListener("click", () => {
+  if (!composing) composer.refresh();
 });
 byId<FormSwitch>("auto-compaction").onchange = () =>
   post({
@@ -100,11 +140,14 @@ function send() {
     !state ||
     state.connection !== "connected" ||
     submitting ||
+    composer.isAttaching ||
     composing ||
     (!promptText().trim() && !state.attachments.length)
   )
     return;
   submittedText = promptText();
+  if (submittedText.startsWith("!"))
+    byId<HTMLDetailsElement>("shell-panel").open = true;
   submitting = true;
   updateSend();
   post({
@@ -119,10 +162,15 @@ function updateSend() {
     submitting || state?.connection !== "connected";
 }
 window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
+  if (data.type === "fileCandidates" || data.type === "contextAttached") {
+    composer.receive(data);
+    return;
+  }
   if (data.type === "sent") {
+    if (submitting) inputHistory.record(submittedText);
     submitting = false;
     if (promptText() === submittedText) prompt.value = "";
-    vscode.setState({ draft: promptText(), editorRevision });
+    saveDraft();
     renderCommands();
     updateSend();
     return;
@@ -131,14 +179,18 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
   state = data.state;
   selections.render(state);
   if (state.error) submitting = false;
-  renderChat(byId("transcript"), state);
+  renderChat(
+    byId("transcript"),
+    state,
+    byId<FormInput>("conversation-search").value ?? "",
+  );
   renderState();
   if (state.editorText && state.editorText.revision !== editorRevision) {
     editorRevision = state.editorText.revision;
     prompt.value = state.editorText.append
       ? [promptText(), state.editorText.text].filter(Boolean).join("\n\n")
       : state.editorText.text;
-    vscode.setState({ draft: promptText(), editorRevision });
+    saveDraft();
     renderCommands();
   }
 });
@@ -200,6 +252,11 @@ function renderState() {
     .join(" · ");
   byId<FormSwitch>("auto-compaction").checked = !!state.compaction.enabled;
   byId<FormSwitch>("auto-retry").checked = !!state.retry.enabled;
+  for (const channel of ["steering", "followUp"] as const) {
+    const select = byId<FormSelect>(`${channel}-mode`);
+    select.value = state.queueModes?.[channel] ?? "";
+    select.disabled = state.connection !== "connected";
+  }
   byId("retry-known").textContent =
     state.retry.enabled === undefined ? "（当前设置未知）" : "";
   const activity = byId("activity");
@@ -238,9 +295,17 @@ function renderState() {
   for (const item of state.attachments) {
     const chip = element("span", "attachment");
     chip.title = item.preview;
-    chip.append(
-      element("span", "", item.kind === "image" ? `▧ ${item.name}` : item.name),
-    );
+    const label = item.reference
+      ? formButton(item.name)
+      : element(
+          "span",
+          "",
+          item.kind === "image" ? `▧ ${item.name}` : item.name,
+        );
+    if (item.reference)
+      label.onclick = () =>
+        post({ type: "openFile", reference: item.reference! });
+    chip.append(label);
     const remove = formButton("×");
     remove.setAttribute("aria-label", `移除 ${item.name}`);
     remove.onclick = () => post({ type: "removeAttachment", id: item.id });
@@ -296,30 +361,7 @@ function renderState() {
   renderCommands();
 }
 function renderCommands() {
-  const menu = byId("command-menu");
-  menu.replaceChildren();
-  const match = promptText().match(/^\/([^\s]*)$/);
-  menu.hidden = !match;
-  if (!match) return;
-  const commands =
-    state?.commands.filter((cmd) =>
-      cmd.name.toLowerCase().includes(match[1].toLowerCase()),
-    ) ?? [];
-  if (!commands.length)
-    menu.append(element("div", "muted", "没有可发现的 PI 命令"));
-  for (const cmd of commands.slice(0, 30)) {
-    const button = formButton(
-      `/${cmd.name} · ${cmd.description ?? cmd.source}`,
-      "command-option",
-    );
-    button.onclick = () => {
-      prompt.value = `/${cmd.name} `;
-      vscode.setState({ draft: promptText(), editorRevision });
-      menu.hidden = true;
-      prompt.focus();
-    };
-    menu.append(button);
-  }
+  if (!composing) composer.refresh();
 }
 async function attachImage(file: File) {
   if (file.size > 5 * 1024 * 1024) {
@@ -356,10 +398,30 @@ root.addEventListener("drop", (event) => {
     if (file.type.startsWith("image/")) void attachImage(file);
 });
 root.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+    "button.content-action",
+  );
+  if (button) {
+    if (button.dataset.copyText !== undefined)
+      post({ type: "copyText", text: button.dataset.copyText });
+    else if (button.dataset.codeText !== undefined)
+      post({
+        type: "openCode",
+        text: button.dataset.codeText,
+        language: button.dataset.language ?? "",
+      });
+    else if (button.dataset.messageIndex !== undefined)
+      post({ type: "forkMessage", index: Number(button.dataset.messageIndex) });
+    else if (button.dataset.reference)
+      post({ type: "openFile", reference: button.dataset.reference });
+    return;
+  }
   const link = (event.target as HTMLElement).closest("a");
   if (link) {
     event.preventDefault();
-    if (/^https?:\/\//i.test(link.href))
+    if (link.dataset.reference)
+      post({ type: "openFile", reference: link.dataset.reference });
+    else if (/^https?:\/\//i.test(link.href))
       post({ type: "openLink", url: link.href });
   }
 });

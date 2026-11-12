@@ -17,6 +17,14 @@ export interface LaunchConfig {
   executablePath?: string;
   nodePath?: string;
 }
+export class PiNotFoundError extends Error {
+  constructor() {
+    super(
+      "未找到本机 PI。请按官方说明安装 PI，安装后重启 VS Code；若已安装，请在用户设置中配置 pi.executablePath 后重新连接。",
+    );
+    this.name = "PiNotFoundError";
+  }
+}
 async function exists(path: string) {
   try {
     await access(path);
@@ -63,10 +71,7 @@ export async function resolvePiLaunch(
       if (executable) break;
     }
   }
-  if (!executable || !(await exists(executable)))
-    throw new Error(
-      "PI was not found. Install PI, restart VS Code, or set pi.executablePath.",
-    );
+  if (!executable || !(await exists(executable))) throw new PiNotFoundError();
   const extension = extname(executable).toLowerCase();
   if ([".js", ".mjs", ".cjs"].includes(extension))
     return { command: node, args: [executable], env };

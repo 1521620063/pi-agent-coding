@@ -93,7 +93,7 @@ footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 5px 9px 9px;
 }
@@ -104,8 +104,14 @@ footer {
 .send-actions {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: 3px;
   min-width: 0;
+}
+.send-actions {
+  margin-left: auto;
 }
 .input-actions wa-button::part(base) {
   padding-inline: 7px;
@@ -150,6 +156,7 @@ wa-option::part(label) {
 }
 .composer-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   margin: 0 10px;
@@ -176,7 +183,8 @@ wa-option::part(label) {
   opacity: 0.7;
 }
 #model-menu {
-  max-width: 70%;
+  flex: 1 1 110px;
+  max-width: 100%;
   min-width: 0;
 }
 #model {
@@ -451,4 +459,47 @@ wa-button.command-option::part(label) {
   wa-button::part(base) {
     transition: none;
   }
+}
+/* Shared @ file and slash command completion. */
+#command-menu {
+  max-height: min(260px, 35vh);
+  overflow: auto;
+  border: 1px solid var(--pi-border);
+  background: var(--pi-surface);
+}
+#command-menu .command-option {
+  display: block;
+  width: 100%;
+}
+#command-menu .command-option[aria-selected="true"]::part(base) {
+  background: var(--pi-hover);
+  outline: 1px solid var(--pi-focus);
+  outline-offset: -1px;
+}
+.completion-hint {
+  padding: 6px;
+  font-size: var(--pi-font-compact);
+}
+.content-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-block: 4px 8px;
+}
+.content-action {
+  color: var(--pi-muted);
+  background: transparent;
+  border: 1px solid var(--pi-border);
+  border-radius: 3px;
+  font: inherit;
+  font-size: 0.85em;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.content-action:focus-visible {
+  outline: 2px solid var(--pi-focus);
+  outline-offset: 2px;
+}
+.conversation-search {
+  margin: 4px 12px;
 }

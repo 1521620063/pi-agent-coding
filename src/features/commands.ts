@@ -13,11 +13,32 @@ export class CommandService {
     if (!Array.isArray(result.commands))
       throw new Error("Incompatible PI command response");
     this.store.update({
-      commands: result.commands.filter(
-        (command) =>
-          typeof command.name === "string" &&
-          ["skill", "prompt", "extension"].includes(command.source),
-      ),
+      commands: result.commands
+        .filter(
+          (command) =>
+            typeof command.name === "string" &&
+            ["skill", "prompt", "extension"].includes(command.source),
+        )
+        .map((command) => {
+          const sourceInfo: NonNullable<SlashCommand["sourceInfo"]> = {};
+          for (const key of ["path", "scope", "origin", "baseDir"] as const) {
+            const value = command.sourceInfo?.[key];
+            if (
+              typeof value === "string" &&
+              value.length <= 32768 &&
+              !/[\u0000-\u001f]/.test(value)
+            )
+              sourceInfo[key] = value;
+          }
+          return {
+            name: command.name,
+            source: command.source,
+            ...(typeof command.description === "string"
+              ? { description: command.description }
+              : {}),
+            ...(Object.keys(sourceInfo).length ? { sourceInfo } : {}),
+          };
+        }),
     });
   }
   async invoke(

@@ -119,6 +119,14 @@ export class SessionService {
       run: state.isStreaming ? "running" : "idle",
       stats: undefined,
       queues: { steering: [], followUp: [] },
+      queueModes: {
+        steering: ["all", "one-at-a-time"].includes(state.steeringMode)
+          ? state.steeringMode
+          : undefined,
+        followUp: ["all", "one-at-a-time"].includes(state.followUpMode)
+          ? state.followUpMode
+          : undefined,
+      },
       compaction: {
         enabled: state.autoCompactionEnabled,
         active: !!state.isCompacting,
@@ -131,6 +139,16 @@ export class SessionService {
   }
   async create(): Promise<void> {
     await this.change({ type: "new_session" });
+  }
+  async restoreLast(): Promise<boolean> {
+    const workspace = this.store.getSnapshot().workspace;
+    if (!workspace) return false;
+    const latest = (await this.list(pathToFileURL(workspace).href))[0];
+    if (!latest) return false;
+    return this.change({
+      type: "switch_session",
+      sessionPath: latest.sessionPath,
+    });
   }
   async openFromPicker(): Promise<void> {
     const path = await this.picker?.();
@@ -154,14 +172,16 @@ export class SessionService {
   private async change(command: {
     type: string;
     sessionPath?: string;
-  }): Promise<void> {
+  }): Promise<boolean> {
     if (this.switching)
       throw new Error("A session change is already in progress.");
     this.switching = true;
     try {
       if (this.store.getSnapshot().run === "running") await this.pi.stopAll();
       const result = await this.pi.request(command, { timeoutMs: 0 });
-      if (!result?.cancelled) await this.refresh();
+      if (result?.cancelled) return false;
+      await this.refresh();
+      return true;
     } finally {
       this.switching = false;
     }

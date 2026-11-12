@@ -1,5 +1,12 @@
 ﻿export const moreActions = [
   ["renameSession", "重命名会话"],
+  ["attachDiagnostics", "选择诊断作为附件"],
+  ["touchedFiles", "本次对话修改的文件"],
+  ["openScm", "打开源代码管理"],
+  ["searchConversation", "搜索 PI 完整历史"],
+  ["showCommands", "技能与模板来源"],
+  ["cycleModel", "轮换模型"],
+  ["cycleThinking", "轮换思考强度"],
   ["openSession", "打开 PI 会话文件"],
   ["fork", "分叉（不回滚文件）"],
   ["clone", "复制（不回滚文件）"],
@@ -18,6 +25,7 @@ export const sidebarMarkup = `
     <wa-button slot="anchor" id="sessions" size="s" appearance="plain" variant="neutral" aria-haspopup="dialog" aria-expanded="false" aria-controls="history-panel">历史</wa-button>
     <section id="history-panel" role="dialog" aria-label="当前工作区历史" tabindex="-1" hidden>
       <div class="history-heading">工作区历史</div>
+      <wa-input id="history-search" size="s" label="筛选会话" placeholder="名称、ID 或路径" clearable></wa-input>
       <div id="history-list"></div>
       <wa-button id="history-open" size="s" appearance="plain" variant="neutral">打开其他 PI 会话文件…</wa-button>
       <p class="muted history-hint">移除记录会保留 PI 会话文件</p>
@@ -29,13 +37,14 @@ export const sidebarMarkup = `
   </wa-dropdown>
 </header>
 <div id="error" role="alert" hidden></div><div id="connection" hidden></div>
+<details class="conversation-search"><summary>搜索对话</summary><wa-input id="conversation-search" size="s" label="搜索当前可见对话" clearable></wa-input><wa-button data-action="searchConversation" size="s" appearance="plain">搜索 PI 完整历史…</wa-button></details>
 <main id="transcript" aria-label="PI 对话" tabindex="0"></main>
 <section id="activity" aria-live="polite"></section><div id="widgets-above"></div><section id="queue" hidden></section>
 <footer>
   <div id="run-controls" hidden><span class="muted">当前任务</span><wa-button data-action="stop" id="stop" size="s" appearance="outlined" variant="danger">停止全部</wa-button></div>
   <div class="composer">
-    <div id="attachments"></div><div id="command-menu" hidden></div>
-    <wa-textarea id="prompt" rows="3" resize="auto" size="s" aria-label="发送给 PI" placeholder="有什么想一起完成的？"></wa-textarea>
+    <div id="attachments"></div><div id="command-menu" role="listbox" aria-label="输入补全" hidden></div>
+    <wa-textarea id="prompt" rows="3" resize="auto" size="s" aria-label="发送给 PI" aria-controls="command-menu" aria-expanded="false" placeholder="有什么想一起完成的？@ 添加文件，/ 选择命令"></wa-textarea>
     <div class="input-actions">
       <div class="attach-actions">
         <wa-button size="s" appearance="plain" variant="neutral" data-action="attachFiles" title="添加文件或图片"><wa-icon slot="start" name="plus"></wa-icon>附件</wa-button>
@@ -61,6 +70,8 @@ export const sidebarMarkup = `
     <div class="settings-fields">
       <wa-switch id="auto-compaction" size="s" hint="由 PI 在需要时整理会话上下文">自动压缩</wa-switch>
       <wa-switch id="auto-retry" size="s" hint="使用 PI 自身的自动重试设置">自动重试<span id="retry-known"></span></wa-switch>
+      <wa-select id="steering-mode" size="s" label="补充指示处理方式" value=""><wa-option value="">PI 设置未知</wa-option><wa-option value="one-at-a-time">逐条处理</wa-option><wa-option value="all">一次处理全部</wa-option></wa-select>
+      <wa-select id="followUp-mode" size="s" label="后续消息处理方式" value=""><wa-option value="">PI 设置未知</wa-option><wa-option value="one-at-a-time">逐条处理</wa-option><wa-option value="all">一次处理全部</wa-option></wa-select>
       <div class="settings-action"><span class="muted">立即整理当前会话</span><wa-button data-action="compact" size="s" appearance="outlined" variant="neutral">手动压缩</wa-button></div>
     </div>
   </details>

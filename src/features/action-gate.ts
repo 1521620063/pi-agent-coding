@@ -9,6 +9,9 @@ const transitions = new Set([
   "chooseThinking",
   "fork",
   "clone",
+  "forkMessage",
+  "cycleModel",
+  "cycleThinking",
 ]);
 const blocked = new Set([
   ...transitions,
@@ -16,6 +19,7 @@ const blocked = new Set([
   "compact",
   "shell",
   "renameSession",
+  "queueMode",
 ]);
 export class ActionGate {
   private changing = false;

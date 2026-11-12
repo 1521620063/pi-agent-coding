@@ -12,13 +12,19 @@ export function createSidebarProvider(
   onAction: (action: ClientAction) => Promise<void>,
   extensionUri: vscode.Uri,
 ): vscode.WebviewViewProvider &
-  vscode.Disposable & { post(message: HostMessage): void } {
+  vscode.Disposable & {
+    post(message: HostMessage): void;
+    readonly isVisible: boolean;
+  } {
   let view: vscode.WebviewView | undefined;
   const disposables: vscode.Disposable[] = [];
   const unsubscribe = store.subscribe((state) => {
     if (view) void view.webview.postMessage(snapshotMessage(state));
   });
   return {
+    get isVisible() {
+      return view?.visible ?? false;
+    },
     resolveWebviewView(current) {
       view = current;
       current.webview.options = {

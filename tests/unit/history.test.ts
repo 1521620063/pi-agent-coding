@@ -35,3 +35,30 @@ it("does not export when the save dialog is cancelled or refresh after cancelled
   await history.clone();
   expect(refresh).not.toHaveBeenCalled();
 });
+
+it("maps visible user messages to PI fork points and rejects mismatched branches", async () => {
+  const store = new SessionStore();
+  store.replaceMessages([{ role: "user", content: "old prompt" }]);
+  const request = vi.fn(async (command) =>
+    command.type === "get_fork_messages"
+      ? { messages: [{ entryId: "point", text: "old prompt" }] }
+      : { cancelled: false, text: "old prompt" },
+  );
+  const history = new HistoryService(
+    { request, stopAll: async () => {} } as any,
+    store,
+    async () => {},
+  );
+  await history.forkMessage(0);
+  expect(request).toHaveBeenCalledWith(
+    { type: "fork", entryId: "point" },
+    { timeoutMs: 0 },
+  );
+  expect(store.getSnapshot().editorText?.text).toBe("old prompt");
+  store.replaceMessages([{ role: "user", content: "other branch" }]);
+  request.mockClear();
+  await expect(history.forkMessage(0)).rejects.toThrow("对应");
+  expect(request.mock.calls.map(([command]) => command.type)).toEqual([
+    "get_fork_messages",
+  ]);
+});

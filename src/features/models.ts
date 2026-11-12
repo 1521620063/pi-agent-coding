@@ -41,4 +41,25 @@ export class ModelService {
     await this.pi.request({ type: "set_thinking_level", level });
     this.store.update({ thinkingLevel: level });
   }
+  async cycleModel(): Promise<void> {
+    const session = this.store.getSnapshot().session?.id;
+    const result = await this.pi.request({ type: "cycle_model" });
+    if (this.store.getSnapshot().session?.id !== session) return;
+    if (result)
+      this.store.update({
+        model: modelPresentation(result.model),
+        thinkingLevel: result.thinkingLevel,
+      });
+    await this.refresh();
+  }
+  async cycleThinking(): Promise<void> {
+    const session = this.store.getSnapshot().session?.id;
+    const result = await this.pi.request({ type: "cycle_thinking_level" });
+    if (this.store.getSnapshot().session?.id !== session) return;
+    if (
+      result &&
+      this.store.getSnapshot().thinkingLevels.includes(result.level)
+    )
+      this.store.update({ thinkingLevel: result.level });
+  }
 }

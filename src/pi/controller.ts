@@ -3,6 +3,7 @@ import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import {
   assertWorkspace,
+  PiNotFoundError,
   resolvePiLaunch,
   type LaunchConfig,
 } from "./launcher";
@@ -157,6 +158,8 @@ export class PiController {
       await this.closeProcess();
       if (generation === this.generation)
         this.store.update({ connection: "error", error: message });
+      if (generation === this.generation && error instanceof PiNotFoundError)
+        throw error;
       throw new Error(message);
     }
   }

@@ -171,10 +171,12 @@ it("keeps newer typing when the previous send is acknowledged", () => {
   prompt.dispatchEvent(new Event("input", { bubbles: true }));
   sent();
   expect((prompt as HTMLTextAreaElement).value).toBe("尚未提交的新内容");
-  expect(setState).toHaveBeenLastCalledWith({
-    draft: "尚未提交的新内容",
-    editorRevision: 0,
-  });
+  expect(setState).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      draft: "尚未提交的新内容",
+      editorRevision: 0,
+    }),
+  );
 });
 
 it("routes switch values and shell form values through existing actions", () => {
@@ -192,6 +194,27 @@ it("routes switch values and shell form values through existing actions", () => 
     [{ type: "autoRetry", enabled: false }],
     [{ type: "shell", command: "echo PI", excludeFromContext: true }],
   ]);
+});
+
+it("filters indexed sessions and routes queue modes without altering the prompt", () => {
+  const state = new SessionStore().getSnapshot();
+  state.connection = "connected";
+  state.sessions = [
+    { sessionId: "one", sessionPath: "one.jsonl", lastOpenedAt: "2026-11-12" },
+    { sessionId: "two", sessionPath: "two.jsonl", lastOpenedAt: "2026-11-12" },
+  ];
+  snapshot(state);
+  value("history-search", "two").dispatchEvent(new Event("input"));
+  expect(
+    control("history-list").querySelectorAll("[data-select-session]"),
+  ).toHaveLength(1);
+  expect(control("history-list").textContent).toContain("two");
+  value("steering-mode", "all").dispatchEvent(new Event("change"));
+  expect(postMessage).toHaveBeenLastCalledWith({
+    type: "queueMode",
+    channel: "steering",
+    mode: "all",
+  });
 });
 
 it("disables empty shell execution and exposes cancellation only while PI shell is active", () => {

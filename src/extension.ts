@@ -1,8 +1,9 @@
 import * as vscode from "vscode";
+import * as path from "node:path";
 import { SessionStore } from "./state/session-store";
 import { createSidebarProvider } from "./sidebar/provider";
 import { PiController } from "./pi/controller";
-import { assertWorkspace } from "./pi/launcher";
+import { assertWorkspace, PiNotFoundError } from "./pi/launcher";
 import { ExtensionUiManager } from "./features/extension-ui";
 import { AttachmentService } from "./features/attachments";
 import { ModelService } from "./features/models";
@@ -13,6 +14,8 @@ import { ContextService, RetryService } from "./features/context";
 import { HistoryService } from "./features/history";
 import { ShellService } from "./features/shell";
 import { ActionGate } from "./features/action-gate";
+import { WorkspaceContextService } from "./features/workspace-context";
+import { TaskNotifications } from "./features/notifications";
 let activeController: PiController | undefined;
 export function activate(context: vscode.ExtensionContext) {
   const store = new SessionStore();
@@ -41,6 +44,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
     return files?.map((file) => file.fsPath);
   });
+  const workspaceContext = new WorkspaceContextService(store, attachments);
   const models = new ModelService(controller, store);
   const commands = new CommandService(controller, store);
   const sessions = new SessionService(
@@ -142,9 +146,10 @@ export function activate(context: vscode.ExtensionContext) {
     store.update({
       error: error instanceof Error ? error.message : String(error),
     });
+  let initializing = false;
   const unsubscribe = controller.onRecord((record) => {
     if (record.type === "extension_ui_request") ui.handle(record as any);
-    if (record.type === "session_info_changed")
+    if (record.type === "session_info_changed" && !initializing)
       void sessions.remember().catch(report);
     if (record.type === "agent_settled" || record.type === "compaction_end")
       void usage.refreshStats().catch(report);
@@ -173,21 +178,77 @@ export function activate(context: vscode.ExtensionContext) {
       trusted: vscode.workspace.isTrusted,
       remote: !!vscode.env.remoteName,
     });
-    ui.dispose();
-    await controller.connect(folder!.uri.toString());
-    await sessions.refresh();
-    await Promise.all([
-      models.refresh(),
-      commands.refresh(),
-      usage.refreshStats(),
-    ]);
+    initializing = true;
+    try {
+      ui.dispose();
+      try {
+        await controller.connect(folder!.uri.toString());
+      } catch (error) {
+        if (error instanceof PiNotFoundError)
+          void showPiInstallationGuide().catch(report);
+        throw error;
+      }
+      try {
+        if (!(await sessions.restoreLast())) await sessions.refresh();
+      } catch (error) {
+        report(
+          new Error(
+            `无法恢复上次会话：${error instanceof Error ? error.message : String(error)}`,
+          ),
+        );
+        await sessions.refresh();
+      }
+      await Promise.all([
+        models.refresh(),
+        commands.refresh(),
+        usage.refreshStats(),
+      ]);
+    } finally {
+      initializing = false;
+    }
   };
   const gate = new ActionGate();
   const provider = createSidebarProvider(
     store,
     async (action) =>
       gate.run(action.type, async () => {
-        store.update({ error: undefined });
+        if (action.type !== "searchFiles") store.update({ error: undefined });
+        if (action.type === "searchFiles") {
+          try {
+            provider.post({
+              type: "fileCandidates",
+              requestId: action.requestId,
+              ...(await workspaceContext.search(action.query)),
+            });
+          } catch (error) {
+            provider.post({
+              type: "fileCandidates",
+              requestId: action.requestId,
+              items: [],
+              truncated: false,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+        if (action.type === "attachContext") {
+          try {
+            await workspaceContext.attach(action.id);
+            provider.post({
+              type: "contextAttached",
+              id: action.id,
+              success: true,
+            });
+          } catch (error) {
+            provider.post({
+              type: "contextAttached",
+              id: action.id,
+              success: false,
+            });
+            throw error;
+          }
+        }
+        if (action.type === "openFile")
+          await workspaceContext.openReference(action.reference);
         if (action.type === "connect") await connect();
         if (action.type === "disconnect") {
           ui.dispose();
@@ -199,6 +260,19 @@ export function activate(context: vscode.ExtensionContext) {
             "@ext:pi-extension.pi-sidebar",
           );
         if (action.type === "send") {
+          if (action.text.startsWith("!")) {
+            if (action.attachmentIds.length)
+              throw new Error(
+                "独立命令不接收附件，请先移除附件或发送普通消息。",
+              );
+            const command = action.text.slice(1).trim();
+            if (!command) throw new Error("请在 ! 后输入命令。");
+            if (command.length > 100000)
+              throw new Error("插件命令限制：最多 100,000 字符。");
+            await shell.execute(command, false);
+            provider.post({ type: "sent", attachmentIds: [] });
+            return;
+          }
           const payload = await attachments.buildPayload(action.attachmentIds);
           await queues.submit(
             [action.text, payload.text].filter(Boolean).join("\n\n"),
@@ -209,7 +283,131 @@ export function activate(context: vscode.ExtensionContext) {
           provider.post({ type: "sent", attachmentIds: action.attachmentIds });
         }
         if (action.type === "attachSelection") await attachSelection();
-        if (action.type === "attachFiles") await attachments.pickFiles();
+        if (action.type === "attachFiles") {
+          const uris = await vscode.window.showOpenDialog({
+            canSelectMany: true,
+            canSelectFiles: true,
+            canSelectFolders: false,
+            title: "添加 UTF-8 文件或图片",
+          });
+          if (uris) await workspaceContext.attachUris(uris);
+        }
+        if (action.type === "attachDiagnostics")
+          await workspaceContext.attachDiagnostics();
+        if (action.type === "copyText")
+          await vscode.env.clipboard.writeText(action.text);
+        if (action.type === "openCode") {
+          const languages = await vscode.languages.getLanguages();
+          const aliases: Record<string, string> = {
+            js: "javascript",
+            ts: "typescript",
+            py: "python",
+            sh: "shellscript",
+            bash: "shellscript",
+            md: "markdown",
+            csharp: "csharp",
+          };
+          const language = aliases[action.language] ?? action.language;
+          const document = await vscode.workspace.openTextDocument({
+            content: action.text,
+            language: languages.includes(language) ? language : "plaintext",
+          });
+          await vscode.window.showTextDocument(document, { preview: false });
+        }
+        if (action.type === "forkMessage")
+          await history.forkMessage(action.index);
+        if (action.type === "queueMode")
+          await queues.setMode(action.channel, action.mode);
+        if (action.type === "cycleModel") await models.cycleModel();
+        if (action.type === "cycleThinking") await models.cycleThinking();
+        if (action.type === "openScm")
+          await vscode.commands.executeCommand("workbench.view.scm");
+        if (action.type === "touchedFiles") {
+          const files = [
+            ...new Set(
+              store
+                .getSnapshot()
+                .tools.filter(
+                  (tool) =>
+                    ["write", "edit"].includes(tool.name) &&
+                    tool.status === "success",
+                )
+                .map((tool) => tool.args.path)
+                .filter((value): value is string => typeof value === "string"),
+            ),
+          ];
+          const selected = await vscode.window.showQuickPick(files, {
+            title: "本次对话已观察到的修改文件",
+            placeHolder: files.length
+              ? "选择文件跳转；差异请在源代码管理中查看"
+              : "尚未观察到 write / edit 成功结果",
+          });
+          if (selected) await workspaceContext.openReference(selected);
+        }
+        if (action.type === "showCommands") {
+          const selected = await vscode.window.showQuickPick(
+            store
+              .getSnapshot()
+              .commands.map((command) => ({
+                label: `/${command.name}`,
+                description: [
+                  command.source,
+                  command.sourceInfo?.scope,
+                  command.sourceInfo?.origin,
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
+                detail: command.sourceInfo?.path ?? "PI 未提供可查看的来源路径",
+                command,
+              })),
+            {
+              title: "PI 技能与模板来源",
+              matchOnDescription: true,
+              matchOnDetail: true,
+            },
+          );
+          const source = selected?.command.sourceInfo?.path;
+          if (
+            source &&
+            vscode.workspace.isTrusted &&
+            !vscode.env.remoteName &&
+            path.isAbsolute(source) &&
+            !/[\u0000-\u001f]/.test(source)
+          ) {
+            const document = await vscode.workspace.openTextDocument(
+              vscode.Uri.file(source),
+            );
+            await vscode.window.showTextDocument(document, { preview: true });
+          }
+        }
+        if (action.type === "searchConversation") {
+          const sessionId = store.getSnapshot().session?.id;
+          const query = await vscode.window.showInputBox({
+            title: "搜索 PI 完整历史",
+            prompt: "包含压缩前及其他分支；最多显示 100 条，每条预览 4000 字符",
+          });
+          if (query && store.getSnapshot().session?.id === sessionId) {
+            const matches = await history.search(query);
+            const selected = await vscode.window.showQuickPick(
+              matches.map((match) => ({
+                label: match.text.slice(0, 120),
+                description: match.entryId,
+                match,
+              })),
+              {
+                title: `完整历史：${matches.length}${matches.length === 100 ? "+" : ""} 条匹配`,
+                matchOnDescription: true,
+              },
+            );
+            if (selected && store.getSnapshot().session?.id === sessionId) {
+              const document = await vscode.workspace.openTextDocument({
+                content: selected.match.text,
+                language: "plaintext",
+              });
+              await vscode.window.showTextDocument(document, { preview: true });
+            }
+          }
+        }
         if (action.type === "removeAttachment") attachments.remove(action.id);
         if (action.type === "image") {
           if (!/^[A-Za-z0-9+/]*={0,2}$/.test(action.data))
@@ -346,12 +544,27 @@ export function activate(context: vscode.ExtensionContext) {
       }),
     context.extensionUri,
   );
+  const notifications = new TaskNotifications();
+  const stopNotifications = store.subscribe((state) => {
+    const message = notifications.observe(
+      state,
+      provider.isVisible && vscode.window.state.focused,
+    );
+    if (message)
+      void vscode.window
+        .showInformationMessage(message, "打开 PI")
+        .then((choice) => {
+          if (choice === "打开 PI")
+            void vscode.commands.executeCommand("pi.sidebar.focus");
+        });
+  });
   context.subscriptions.push(
     output,
     provider,
     {
       dispose: () => {
         unsubscribe();
+        stopNotifications();
         ui.dispose();
         shell.dispose();
         void controller.disconnect();
@@ -365,8 +578,45 @@ export function activate(context: vscode.ExtensionContext) {
       gate.run("connect", connect),
     ),
     vscode.commands.registerCommand("pi.attachSelection", attachSelection),
+    vscode.commands.registerCommand(
+      "pi.attachFiles",
+      async (uri?: vscode.Uri, selected?: vscode.Uri[]) => {
+        const uris = selected?.length ? selected : uri ? [uri] : [];
+        if (uris.length) await workspaceContext.attachUris(uris);
+        await vscode.commands.executeCommand("pi.sidebar.focus");
+      },
+    ),
+    vscode.commands.registerCommand("pi.cycleModel", () =>
+      gate.run("cycleModel", () => models.cycleModel()),
+    ),
+    vscode.commands.registerCommand("pi.cycleThinking", () =>
+      gate.run("cycleThinking", () => models.cycleThinking()),
+    ),
   );
+  if (
+    vscode.workspace.isTrusted &&
+    !vscode.env.remoteName &&
+    vscode.workspace.workspaceFolders?.length &&
+    vscode.workspace.workspaceFolders.every(
+      (folder) => new URL(folder.uri.toString()).protocol === "file:",
+    )
+  )
+    void gate.run("connect", connect).catch(report);
   return { store, controller, attachments };
+}
+async function showPiInstallationGuide() {
+  const choice = await vscode.window.showInformationMessage(
+    "未找到本机 PI。若尚未安装，请打开官方安装说明；安装后重启 VS Code，并在 PI 中完成登录或模型配置。若已安装，可配置 PI 路径后重新连接。",
+    "打开安装说明",
+    "配置 PI 路径",
+  );
+  if (choice === "打开安装说明")
+    await vscode.env.openExternal(vscode.Uri.parse("https://pi.dev/"));
+  if (choice === "配置 PI 路径")
+    await vscode.commands.executeCommand(
+      "workbench.action.openSettings",
+      "pi.executablePath",
+    );
 }
 export async function deactivate() {
   await activeController?.disconnect();

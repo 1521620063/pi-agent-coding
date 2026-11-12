@@ -3,7 +3,7 @@ import type { WaSelectEvent } from "@awesome.me/webawesome/dist/events/select.js
 import type WaPopup from "@awesome.me/webawesome/dist/components/popup/popup.js";
 import type WaDropdown from "@awesome.me/webawesome/dist/components/dropdown/dropdown.js";
 import type WaDropdownItem from "@awesome.me/webawesome/dist/components/dropdown-item/dropdown-item.js";
-import { formButton, type FormButton } from "./components";
+import { formButton, type FormButton, type FormInput } from "./components";
 
 export function setupSelections(
   root: HTMLElement,
@@ -20,6 +20,13 @@ export function setupSelections(
   let lastModels = "";
   let lastThinking = "";
   let lastHistory = "";
+  const search = get<FormInput>("history-search");
+  search?.addEventListener("input", () => {
+    if (current) {
+      lastHistory = "";
+      render(current);
+    }
+  });
 
   const closeHistory = (restoreFocus = false) => {
     historyPopup.active = false;
@@ -114,95 +121,102 @@ export function setupSelections(
     }
     menu.append(...items);
   };
-  return {
-    render(state: ViewState) {
-      current = state;
-      const connected = state.connection === "connected";
-      trigger.disabled = !connected;
-      if (!connected) {
-        closeHistory();
-        closeMenus();
-      }
-      const modelsKey = JSON.stringify([state.models, state.model]);
-      if (modelsKey !== lastModels) {
-        lastModels = modelsKey;
-        replaceItems(
-          modelMenu,
-          state.models.map((model, index) => {
-            const item = menuItem(
-              model.name ?? model.id,
-              String(index),
-              model.provider === state.model?.provider &&
-                model.id === state.model?.id,
-            );
-            const provider = document.createElement("span");
-            provider.slot = "details";
-            provider.textContent = model.provider;
-            item.append(provider);
-            item.title = `${model.name ?? model.id} · ${model.provider}`;
-            return item;
-          }),
-          "暂无可用模型",
-        );
-      }
-      const thinkingKey = JSON.stringify([
-        state.thinkingLevels,
-        state.thinkingLevel,
-      ]);
-      if (thinkingKey !== lastThinking) {
-        lastThinking = thinkingKey;
-        replaceItems(
-          thinkingMenu,
-          state.thinkingLevels.map((level) =>
-            menuItem(level, level, level === state.thinkingLevel),
-          ),
-          "暂无可用思考强度",
-        );
-      }
-      const historyKey = JSON.stringify([
-        state.workspace,
-        state.sessions,
-        state.session?.path,
-      ]);
-      if (historyKey === lastHistory) return;
-      lastHistory = historyKey;
-      const list = get("history-list");
-      const hadFocus = list.contains(document.activeElement);
-      list.replaceChildren();
-      if (!state.sessions?.length) {
-        const empty = document.createElement("p");
-        empty.className = "muted history-empty";
-        empty.textContent = "当前工作区暂无历史记录";
-        list.append(empty);
-      }
-      for (const session of state.sessions ?? []) {
-        const row = document.createElement("div");
-        row.className = "history-row";
-        const open = formButton(
-          session.name ?? session.sessionId,
-          "history-session",
-        );
-        open.dataset.selectSession = session.sessionPath;
-        open.title = `${session.name ?? session.sessionId}\n${session.lastOpenedAt}`;
-        if (session.sessionPath === state.session?.path)
-          open.setAttribute("aria-current", "true");
-        open.onclick = () => {
-          closeHistory(true);
-          post({ type: "selectSession", sessionPath: session.sessionPath });
-        };
-        const remove = formButton("×", "history-remove");
-        remove.dataset.removeSession = session.sessionPath;
-        remove.setAttribute(
-          "aria-label",
-          `移除历史记录：${session.name ?? session.sessionId}`,
-        );
-        remove.title = "移除历史记录（保留 PI 会话文件）";
-        remove.onclick = () =>
-          post({ type: "removeSession", sessionPath: session.sessionPath });
-        row.append(open, remove);
-        list.append(row);
-      }
-      if (hadFocus && !panel.hidden) panel.focus();
-    },
-  };
+  function render(state: ViewState) {
+    current = state;
+    const connected = state.connection === "connected";
+    trigger.disabled = !connected;
+    if (!connected) {
+      closeHistory();
+      closeMenus();
+    }
+    const modelsKey = JSON.stringify([state.models, state.model]);
+    if (modelsKey !== lastModels) {
+      lastModels = modelsKey;
+      replaceItems(
+        modelMenu,
+        state.models.map((model, index) => {
+          const item = menuItem(
+            model.name ?? model.id,
+            String(index),
+            model.provider === state.model?.provider &&
+              model.id === state.model?.id,
+          );
+          const provider = document.createElement("span");
+          provider.slot = "details";
+          provider.textContent = model.provider;
+          item.append(provider);
+          item.title = `${model.name ?? model.id} · ${model.provider}`;
+          return item;
+        }),
+        "暂无可用模型",
+      );
+    }
+    const thinkingKey = JSON.stringify([
+      state.thinkingLevels,
+      state.thinkingLevel,
+    ]);
+    if (thinkingKey !== lastThinking) {
+      lastThinking = thinkingKey;
+      replaceItems(
+        thinkingMenu,
+        state.thinkingLevels.map((level) =>
+          menuItem(level, level, level === state.thinkingLevel),
+        ),
+        "暂无可用思考强度",
+      );
+    }
+    const historyKey = JSON.stringify([
+      search?.value,
+      state.workspace,
+      state.sessions,
+      state.session?.path,
+    ]);
+    if (historyKey === lastHistory) return;
+    lastHistory = historyKey;
+    const list = get("history-list");
+    const hadFocus = list.contains(document.activeElement);
+    list.replaceChildren();
+    const query = (search?.value ?? "").toLocaleLowerCase();
+    const sessions =
+      state.sessions?.filter((session) =>
+        [session.name, session.sessionId, session.sessionPath].some((value) =>
+          value?.toLocaleLowerCase().includes(query),
+        ),
+      ) ?? [];
+    if (!sessions.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted history-empty";
+      empty.textContent = query ? "没有匹配的会话" : "当前工作区暂无历史记录";
+      list.append(empty);
+    }
+    for (const session of sessions) {
+      const row = document.createElement("div");
+      row.className = "history-row";
+      const open = formButton(
+        session.name ?? session.sessionId,
+        "history-session",
+      );
+      open.dataset.selectSession = session.sessionPath;
+      open.title = `${session.name ?? session.sessionId}\n${session.lastOpenedAt}`;
+      if (session.sessionPath === state.session?.path)
+        open.setAttribute("aria-current", "true");
+      open.onclick = () => {
+        closeHistory(true);
+        post({ type: "selectSession", sessionPath: session.sessionPath });
+      };
+      const remove = formButton("×", "history-remove");
+      remove.dataset.removeSession = session.sessionPath;
+      remove.setAttribute(
+        "aria-label",
+        `移除历史记录：${session.name ?? session.sessionId}`,
+      );
+      remove.title = "移除历史记录（保留 PI 会话文件）";
+      remove.onclick = () =>
+        post({ type: "removeSession", sessionPath: session.sessionPath });
+      row.append(open, remove);
+      list.append(row);
+    }
+    if (hadFocus && !panel.hidden) panel.focus();
+  }
+  return { render };
 }

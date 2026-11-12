@@ -28,6 +28,7 @@
     "virtualWorkspaces": false
   },
   "activationEvents": [
+    "onStartupFinished",
     "onView:pi.sidebar"
   ],
   "contributes": {
@@ -61,9 +62,40 @@
       {
         "command": "pi.reconnect",
         "title": "PI: Reconnect"
+      },
+      {
+        "command": "pi.attachFiles",
+        "title": "PI: 添加到 PI"
+      },
+      {
+        "command": "pi.cycleModel",
+        "title": "PI: 轮换模型"
+      },
+      {
+        "command": "pi.cycleThinking",
+        "title": "PI: 轮换思考强度"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "pi.cycleModel",
+        "key": "alt+shift+m",
+        "when": "focusedView == pi.sidebar"
+      },
+      {
+        "command": "pi.cycleThinking",
+        "key": "alt+shift+t",
+        "when": "focusedView == pi.sidebar"
       }
     ],
     "menus": {
+      "explorer/context": [
+        {
+          "command": "pi.attachFiles",
+          "group": "navigation",
+          "when": "resourceScheme == file && !explorerResourceIsFolder"
+        }
+      ],
       "editor/context": [
         {
           "command": "pi.attachSelection",
@@ -112,6 +144,7 @@
     "test": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:vscode": "node scripts/test-vscode.mjs",
+    "test:webview": "npm run compile && node scripts/test-webview.mjs",
     "package": "npm run compile && vsce package --no-dependencies --allow-missing-repository",
     "vscode:prepublish": "npm run compile"
   },

@@ -41,6 +41,12 @@ export interface SlashCommand {
   name: string;
   description?: string;
   source: "extension" | "prompt" | "skill";
+  sourceInfo?: {
+    path?: string;
+    scope?: string;
+    origin?: string;
+    baseDir?: string;
+  };
 }
 export interface AgentMessage extends JsonObject {
   role: string;

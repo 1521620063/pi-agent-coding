@@ -20,6 +20,8 @@ input.on("line", (line) => {
     isCompacting: false,
     model: { id: "fake", provider: "test", input: ["text", "image"] },
     autoCompactionEnabled: true,
+    steeringMode: "one-at-a-time",
+    followUpMode: "all",
   };
   const data =
     cmd.type === "get_state"
@@ -32,9 +34,17 @@ input.on("line", (line) => {
             ? { levels: ["off", "medium"] }
             : cmd.type === "get_commands"
               ? { commands: [] }
-              : cmd.type === "clear_queue"
-                ? { steering: [], followUp: [] }
-                : {};
+              : cmd.type === "cycle_model"
+                ? {
+                    model: state.model,
+                    thinkingLevel: "medium",
+                    isScoped: false,
+                  }
+                : cmd.type === "cycle_thinking_level"
+                  ? { level: "off" }
+                  : cmd.type === "clear_queue"
+                    ? { steering: [], followUp: [] }
+                    : {};
   emit({
     id: cmd.id,
     type: "response",

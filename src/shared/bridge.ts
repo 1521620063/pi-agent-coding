@@ -14,6 +14,13 @@ export interface Attachment {
   kind: "text" | "image";
   size: number;
   preview: string;
+  reference?: string;
+}
+export interface ContextFile {
+  id: string;
+  label: string;
+  description?: string;
+  source: "workspace" | "open" | "current";
 }
 export interface ToolView {
   id: string;
@@ -32,6 +39,10 @@ export interface ViewState {
   messages: AgentMessage[];
   tools: ToolView[];
   queues: { steering: string[]; followUp: string[] };
+  queueModes?: {
+    steering?: "all" | "one-at-a-time";
+    followUp?: "all" | "one-at-a-time";
+  };
   pendingUi: JsonObject[];
   attachments: Attachment[];
   models: Model[];
@@ -92,14 +103,50 @@ export type ClientAction =
   | { type: "image"; data: string; mimeType: string; name: string }
   | { type: "autoCompaction" | "autoRetry"; enabled: boolean }
   | { type: "shell"; command: string; excludeFromContext: boolean }
+  | { type: "searchFiles"; query: string; requestId: number }
+  | { type: "attachContext"; id: string }
+  | { type: "openFile"; reference: string }
+  | {
+      type:
+        | "attachDiagnostics"
+        | "touchedFiles"
+        | "openScm"
+        | "searchConversation"
+        | "showCommands"
+        | "cycleModel"
+        | "cycleThinking";
+    }
+  | { type: "forkMessage"; index: number }
+  | { type: "copyText"; text: string }
+  | { type: "openCode"; text: string; language: string }
+  | {
+      type: "queueMode";
+      channel: "steering" | "followUp";
+      mode: "all" | "one-at-a-time";
+    }
   | { type: "openLink"; url: string };
 export type HostMessage =
   | { type: "snapshot"; state: ViewState }
+  | { type: "contextAttached"; id: string; success: boolean }
+  | {
+      type: "fileCandidates";
+      requestId: number;
+      items: ContextFile[];
+      truncated: boolean;
+      error?: string;
+    }
   | { type: "sent"; attachmentIds: string[] };
 export function snapshotMessage(state: ViewState): HostMessage {
   return { type: "snapshot", state };
 }
 const simple = new Set([
+  "attachDiagnostics",
+  "touchedFiles",
+  "openScm",
+  "searchConversation",
+  "showCommands",
+  "cycleModel",
+  "cycleThinking",
   "ready",
   "connect",
   "disconnect",
@@ -124,6 +171,68 @@ const simple = new Set([
 export function parseClientAction(value: unknown): ClientAction | undefined {
   if (!isObject(value) || typeof value.type !== "string") return;
   const keys = Object.keys(value);
+  if (
+    value.type === "forkMessage" &&
+    keys.length === 2 &&
+    Number.isSafeInteger(value.index) &&
+    value.index >= 0
+  )
+    return value as ClientAction;
+  if (
+    value.type === "copyText" &&
+    keys.length === 2 &&
+    typeof value.text === "string" &&
+    value.text.length <= 2_000_000
+  )
+    return value as ClientAction;
+  if (
+    value.type === "openCode" &&
+    keys.length === 3 &&
+    typeof value.text === "string" &&
+    value.text.length <= 2_000_000 &&
+    typeof value.language === "string" &&
+    /^[\w+-]{0,80}$/.test(value.language)
+  )
+    return value as ClientAction;
+  if (
+    value.type === "queueMode" &&
+    keys.length === 3 &&
+    ["steering", "followUp"].includes(value.channel) &&
+    ["all", "one-at-a-time"].includes(value.mode)
+  )
+    return value as ClientAction;
+  if (
+    value.type === "searchFiles" &&
+    keys.length === 3 &&
+    typeof value.query === "string" &&
+    value.query.length <= 2000 &&
+    Number.isSafeInteger(value.requestId) &&
+    value.requestId >= 0
+  )
+    return value as ClientAction;
+  if (
+    value.type === "attachContext" &&
+    keys.length === 2 &&
+    typeof value.id === "string" &&
+    value.id.length > 0 &&
+    value.id.length <= 200
+  )
+    return value as ClientAction;
+  if (
+    value.type === "openFile" &&
+    keys.length === 2 &&
+    typeof value.reference === "string" &&
+    value.reference.length > 0 &&
+    value.reference.length <= 32768 &&
+    !/[\u0000-\u001f]/.test(value.reference) &&
+    !/^(?:command|javascript|data|file|https?|vscode):/i.test(
+      value.reference,
+    ) &&
+    (!/^(?![A-Za-z]:[\\/])[A-Za-z][\w+.-]*:/.test(value.reference) ||
+      value.reference.startsWith("untitled:") ||
+      /^[^:/\\]+:\d+(?::\d+)?$/.test(value.reference))
+  )
+    return value as ClientAction;
   if (simple.has(value.type))
     return keys.length === 1 ? (value as ClientAction) : undefined;
   if (

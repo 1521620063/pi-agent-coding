@@ -23,4 +23,18 @@ export class QueueService {
     this.store.update({ queues: { steering: [], followUp: [] } });
     return { steering: result.steering, followUp: result.followUp };
   }
+  async setMode(
+    channel: "steering" | "followUp",
+    mode: "all" | "one-at-a-time",
+  ): Promise<void> {
+    const session = this.store.getSnapshot().session?.id;
+    await this.pi.request({
+      type: channel === "steering" ? "set_steering_mode" : "set_follow_up_mode",
+      mode,
+    });
+    if (this.store.getSnapshot().session?.id !== session) return;
+    this.store.update({
+      queueModes: { ...this.store.getSnapshot().queueModes, [channel]: mode },
+    });
+  }
 }

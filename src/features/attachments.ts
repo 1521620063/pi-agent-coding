@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { basename, extname } from "node:path";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import type * as vscode from "vscode";
 import type { Attachment } from "../shared/bridge";
 import type { ImageContent } from "../pi/protocol";
@@ -21,62 +21,66 @@ export class AttachmentService {
     const text = editor.document.getText(editor.selection);
     if (!text) throw new Error("当前选区为空。");
     const name = `${basename(editor.document.fileName)}:${editor.selection.start.line + 1}-${editor.selection.end.line + 1}`;
-    return this.add({
-      metadata: {
-        id: randomUUID(),
-        name,
-        kind: "text",
-        size: Buffer.byteLength(text),
-        preview: text.slice(0, 300),
-      },
-      text: `[${name}]\n${text}`,
-    });
+    let reference: string | undefined;
+    if (editor.document.uri?.scheme === "file") {
+      try {
+        reference = `${await realpath(editor.document.fileName)}:${editor.selection.start.line + 1}`;
+      } catch {
+        // Unsaved new files do not have a filesystem path yet.
+      }
+    }
+    return this.addText(name, text, reference);
   }
   async pickFiles(): Promise<Attachment[]> {
     const paths = await this.picker?.();
     const result: Attachment[] = [];
-    for (const path of paths ?? []) {
-      const info = await stat(path);
-      if (info.size > 5 * 1024 * 1024)
-        throw new Error("插件附件限制：每个文件不超过 5 MiB。");
-      const bytes = await readFile(path);
-      const mime = (
-        {
-          ".png": "image/png",
-          ".jpg": "image/jpeg",
-          ".jpeg": "image/jpeg",
-          ".gif": "image/gif",
-          ".webp": "image/webp",
-        } as Record<string, string>
-      )[extname(path).toLowerCase()];
-      if (mime)
-        result.push(
-          await this.addImage({ bytes, mimeType: mime, name: basename(path) }),
-        );
-      else {
-        if (bytes.includes(0))
-          throw new Error("仅支持 UTF-8 文本或 PNG/JPEG/GIF/WebP 图片。");
-        const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-        result.push(
-          this.add({
-            metadata: {
-              id: randomUUID(),
-              name: basename(path),
-              kind: "text",
-              size: bytes.length,
-              preview: text.slice(0, 300),
-            },
-            text: `[${basename(path)}]\n${text}`,
-          }),
-        );
-      }
-    }
+    for (const path of paths ?? []) result.push(await this.addFile(path));
     return result;
+  }
+  addText(name: string, text: string, reference?: string): Attachment {
+    const size = Buffer.byteLength(text);
+    if (size > 5 * 1024 * 1024)
+      throw new Error("插件附件限制：每个文件不超过 5 MiB。");
+    if (text.includes("\0"))
+      throw new Error("仅支持 UTF-8 文本或 PNG/JPEG/GIF/WebP 图片。");
+    const metadata: Attachment & { reference?: string } = {
+      id: randomUUID(),
+      name,
+      kind: "text",
+      size,
+      preview: text.slice(0, 300),
+      ...(reference ? { reference } : {}),
+    };
+    return this.add({ metadata, text: `[${name}]\n${text}` });
+  }
+  async addFile(path: string, name = basename(path)): Promise<Attachment> {
+    const actual = await realpath(path);
+    const info = await stat(actual);
+    if (!info.isFile()) throw new Error("请选择文件。");
+    if (info.size > 5 * 1024 * 1024)
+      throw new Error("插件附件限制：每个文件不超过 5 MiB。");
+    const bytes = await readFile(actual);
+    const mime = (
+      {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+      } as Record<string, string>
+    )[extname(path).toLowerCase()];
+    if (mime)
+      return this.addImage({ bytes, mimeType: mime, name, reference: actual });
+    if (bytes.includes(0))
+      throw new Error("仅支持 UTF-8 文本或 PNG/JPEG/GIF/WebP 图片。");
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return this.addText(name, text, actual);
   }
   async addImage(input: {
     bytes: Uint8Array;
     mimeType: string;
     name: string;
+    reference?: string;
   }): Promise<Attachment> {
     const bytes = Buffer.from(input.bytes);
     const magic = imageMime(bytes);
@@ -96,6 +100,7 @@ export class AttachmentService {
         kind: "image",
         size: bytes.length,
         preview: `${input.mimeType} · ${bytes.length} bytes`,
+        ...(input.reference ? { reference: input.reference } : {}),
       },
       image: {
         type: "image",
