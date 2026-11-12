@@ -237,6 +237,42 @@ try {
   assert.equal(await page.locator("[data-select-session]").count(), 1);
   await page.keyboard.press("Escape");
   assert.equal(await page.locator("#history-panel").isVisible(), false);
+  await page.evaluate(() => {
+    window.fixtureState = { ...window.fixtureState, run: "running" };
+    window.deliver({ type: "snapshot", state: window.fixtureState });
+  });
+  const working = page.locator("#activity .working");
+  await working.waitFor();
+  assert.equal(await working.textContent(), "Working");
+  const workingNode = await working.elementHandle();
+  const spinnerFrame = () =>
+    page
+      .locator(".working-spinner")
+      .evaluate((node) => getComputedStyle(node, "::before").content);
+  const firstFrame = await spinnerFrame();
+  await page.waitForFunction(
+    (first) =>
+      getComputedStyle(document.querySelector(".working-spinner"), "::before")
+        .content !== first,
+    firstFrame,
+  );
+  await page.evaluate(() =>
+    window.deliver({ type: "snapshot", state: window.fixtureState }),
+  );
+  assert.ok(
+    await workingNode.evaluate(
+      (node) => node === document.querySelector(".working"),
+    ),
+    "Streaming updates should preserve the active spinner",
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  assert.equal(
+    await page
+      .locator(".working-spinner")
+      .evaluate((node) => getComputedStyle(node, "::before").animationName),
+    "none",
+  );
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   for (const [theme, colors] of Object.entries(themes)) {
     for (const width of [320, 480])
       for (const zoom of [1, 2]) {
@@ -435,6 +471,13 @@ try {
     join(artifacts, "result.json"),
     JSON.stringify({ passed: true, cases: 12, failures }, null, 2),
   );
+  await page.evaluate(() =>
+    window.deliver({
+      type: "snapshot",
+      state: { ...window.fixtureState, run: "idle" },
+    }),
+  );
+  assert.equal(await page.locator("#activity .working").count(), 0);
   console.log(
     `Webview interactions and 12 render cases passed. Browser fixture screenshots: ${artifacts}`,
   );

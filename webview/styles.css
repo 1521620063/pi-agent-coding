@@ -678,12 +678,50 @@ input[type="checkbox"] {
   align-items: center;
   gap: 7px;
 }
-.working::before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--pi-accent);
+.working-spinner {
+  flex: 0 0 1ch;
+  width: 1ch;
+  color: var(--pi-accent);
+  font-family: var(--vscode-editor-font-family, monospace);
+  line-height: 1;
+}
+.working-spinner::before {
+  content: "⠋";
+  animation: working-dots 800ms step-end infinite;
+}
+@keyframes working-dots {
+  10% {
+    content: "⠙";
+  }
+  20% {
+    content: "⠹";
+  }
+  30% {
+    content: "⠸";
+  }
+  40% {
+    content: "⠼";
+  }
+  50% {
+    content: "⠴";
+  }
+  60% {
+    content: "⠦";
+  }
+  70% {
+    content: "⠧";
+  }
+  80% {
+    content: "⠇";
+  }
+  90% {
+    content: "⠏";
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .working-spinner::before {
+    animation: none;
+  }
 }
 #queue {
   margin: 5px 12px;

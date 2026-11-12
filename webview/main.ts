@@ -260,7 +260,15 @@ function renderState() {
   byId("retry-known").textContent =
     state.retry.enabled === undefined ? "（当前设置未知）" : "";
   const activity = byId("activity");
-  activity.replaceChildren();
+  const keepWorking =
+    state.run === "running" &&
+    !state.retry.active &&
+    !state.compaction.active &&
+    !!activity.querySelector(".working");
+  if (keepWorking) {
+    for (const child of Array.from(activity.children))
+      if (!child.classList.contains("working")) child.remove();
+  } else activity.replaceChildren();
   if (state.retry.active) {
     activity.append(
       element(
@@ -274,9 +282,17 @@ function renderState() {
     activity.append(cancel);
   } else if (state.compaction.active)
     activity.append(element("span", "", "正在压缩上下文…"));
-  else if (state.run === "running")
-    activity.append(element("span", "working", "PI 正在工作…"));
-  else if (state.compaction.result?.summary) {
+  else if (state.run === "running") {
+    if (!keepWorking) {
+      const working = element("span", "working");
+      working.setAttribute("role", "status");
+      working.setAttribute("aria-label", "PI 正在工作");
+      const spinner = element("span", "working-spinner");
+      spinner.setAttribute("aria-hidden", "true");
+      working.append(spinner, document.createTextNode("Working"));
+      activity.append(working);
+    }
+  } else if (state.compaction.result?.summary) {
     const summary = element("details");
     summary.append(
       element("summary", "", "上下文已压缩 · 查看摘要"),
