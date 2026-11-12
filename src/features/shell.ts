@@ -42,10 +42,11 @@ export class ShellService {
         { timeoutMs: 0 },
       );
       const previous = this.store.getSnapshot().shell?.output;
-      const output = previous || result.output || "";
+      const hasFinalOutput = typeof result.output === "string";
+      const output = hasFinalOutput ? result.output : (previous ?? "");
       const previewTruncated =
-        !!this.store.getSnapshot().shell?.previewTruncated ||
-        output.length > 200000;
+        output.length > 200000 ||
+        (!hasFinalOutput && !!this.store.getSnapshot().shell?.previewTruncated);
       this.store.update({
         shell: {
           ...result,

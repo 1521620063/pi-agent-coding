@@ -1,6 +1,10 @@
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
-import type { AgentMessage, JsonObject } from "../src/pi/protocol";
+import {
+  isObject,
+  type AgentMessage,
+  type JsonObject,
+} from "../src/pi/protocol";
 import type { ToolView, ViewState } from "../src/shared/bridge";
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
 const original = md.validateLink.bind(md);
@@ -211,7 +215,9 @@ export function renderTool(tool: ToolView) {
     open.dataset.reference = tool.args.path;
     details.append(open);
   }
-  for (const block of tool.result?.content ?? []) {
+  const content = tool.result?.content;
+  for (const block of Array.isArray(content) ? content : []) {
+    if (!isObject(block)) continue;
     if (block.type === "text") {
       const text = String(block.text ?? "");
       details.append(
@@ -233,7 +239,12 @@ export function renderTool(tool: ToolView) {
     if (typeof patch === "string") {
       details.append(
         element("div", "muted", "已修改 · 差异"),
-        element("pre", "diff", patch.slice(0, 30000)),
+        element(
+          "pre",
+          "diff",
+          patch.slice(0, 30000) +
+            (patch.length > 30000 ? "\n…显示已截断（插件限制）" : ""),
+        ),
       );
     }
   }

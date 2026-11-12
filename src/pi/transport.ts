@@ -19,6 +19,7 @@ export function createRpcTransport(
 ): RpcTransport {
   const decoder = new JsonlDecoder();
   const listeners = new Set<(record: PiRecord) => void>();
+  const writes = new Set<(error: Error) => void>();
   const pending = new Map<
     string,
     {
@@ -37,15 +38,28 @@ export function createRpcTransport(
       item.reject(error);
     }
     pending.clear();
+    for (const reject of writes) reject(error);
+    writes.clear();
     stdout.off("data", onData);
     stdout.off("end", onEnd);
-    stdout.off("error", onError);
-    stdin.off("error", onError);
+    // A buffered write can still emit EPIPE after disposal. Keep error
+    // listeners until the corresponding pipe has actually closed.
     listeners.clear();
   }
   function onError(error: Error) {
+    if (closed) return;
     close(error);
     onFatal?.(error);
+  }
+  function onStdoutClose() {
+    stdout.off("error", onError);
+    stdout.off("close", onStdoutClose);
+    onError(new Error("PI transport closed: stdout closed"));
+  }
+  function onStdinClose() {
+    stdin.off("error", onError);
+    stdin.off("close", onStdinClose);
+    onError(new Error("PI transport closed: stdin closed"));
   }
   function onEnd() {
     try {
@@ -86,7 +100,8 @@ export function createRpcTransport(
           try {
             listener(record);
           } catch (error) {
-            onFatal?.(error as Error);
+            onError(error instanceof Error ? error : new Error(String(error)));
+            return;
           }
         }
     }
@@ -95,13 +110,26 @@ export function createRpcTransport(
   stdout.on("end", onEnd);
   stdout.on("error", onError);
   stdin.on("error", onError);
+  stdout.on("close", onStdoutClose);
+  stdin.on("close", onStdinClose);
   async function write(record: PiRecord): Promise<void> {
     if (closed || stdin.destroyed || stdin.writableEnded)
       throw new Error("PI transport closed");
+    const data = JSON.stringify(record) + "\n";
     await new Promise<void>((resolve, reject) => {
-      stdin.write(JSON.stringify(record) + "\n", (error) =>
-        error ? reject(error) : resolve(),
-      );
+      const fail = (error: Error) => {
+        writes.delete(fail);
+        reject(error);
+      };
+      writes.add(fail);
+      try {
+        stdin.write(data, (error) => {
+          writes.delete(fail);
+          error ? reject(error) : resolve();
+        });
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error(String(error)));
+      }
     });
   }
   return {

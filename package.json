@@ -3,8 +3,23 @@
   "displayName": "PI",
   "description": "A native-feeling VS Code sidebar for your locally installed PI coding agent.",
   "version": "1.0.0",
-  "publisher": "pi-extension",
+  "publisher": "SilasPaul",
   "license": "MIT",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1f1f1f",
+    "theme": "dark"
+  },
+  "keywords": [
+    "pi",
+    "ai",
+    "agent",
+    "coding-agent",
+    "sidebar",
+    "chat",
+    "assistant",
+    "llm"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/1521620063/PI-Extension.git"

@@ -118,8 +118,10 @@ export class PiController {
         this.diagnostics = (this.diagnostics + message).slice(-12000);
         this.log(message);
       });
+      let failure: Error | undefined;
       const fail = (error: Error) => {
         if (this.child !== child || this.closing) return;
+        failure = error;
         this.rpc?.dispose();
         this.store.update({
           connection: "error",
@@ -146,6 +148,10 @@ export class PiController {
         { timeoutMs: this.config.startupTimeoutMs ?? 60000 },
       );
       check();
+      // A response and a fatal event can be delivered in the same stdout chunk.
+      // The response promise is already resolved, so cancellation alone cannot
+      // stop its continuation from publishing a dead process as connected.
+      if (failure) throw failure;
       this.store.update({
         connection: "connected",
         workspace: fileURLToPath(workspaceUri),

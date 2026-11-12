@@ -272,11 +272,7 @@ export function setupComposer(
           (position === 0 && !text.includes("\n")))
       ) {
         prompt.value = history.previous(text);
-      } else if (
-        event.key === "ArrowDown" &&
-        (history.isBrowsing ||
-          (position === text.length && !text.includes("\n")))
-      ) {
+      } else if (event.key === "ArrowDown" && history.isBrowsing) {
         prompt.value = history.next();
       } else return false;
       event.preventDefault();

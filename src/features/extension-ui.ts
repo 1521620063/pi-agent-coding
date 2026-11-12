@@ -30,10 +30,15 @@ export class ExtensionUiManager {
         );
       this.pending.set(record.id, item);
       this.publish();
-      if (this.show)
+      if (this.show) {
+        const reply = (answer: UiAnswer) => {
+          if (this.pending.get(record.id) === item)
+            return this.reply(record.id, answer);
+        };
         void this.show(record)
-          .then((answer) => this.reply(record.id, answer))
-          .catch(() => this.reply(record.id, { cancelled: true }));
+          .then(reply)
+          .catch(() => reply({ cancelled: true }));
+      }
     } else if (
       record.method === "setStatus" &&
       typeof record.statusKey === "string"
@@ -103,6 +108,7 @@ export class ExtensionUiManager {
   dispose() {
     for (const item of this.pending.values()) clearTimeout(item.timer);
     this.pending.clear();
+    this.seen.clear();
     this.publish();
   }
 }

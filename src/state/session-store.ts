@@ -36,6 +36,7 @@ export class SessionStore {
     this.emit();
   }
   replaceMessages(messages: AgentMessage[]): void {
+    messages = messages.filter(validMessage);
     this.activeMessage = undefined;
     this.state.messages = structuredClone(messages);
     this.state.tools = [];
@@ -86,6 +87,7 @@ export class SessionStore {
         const event = record.assistantMessageEvent;
         if (
           !isObject(event) ||
+          typeof event.type !== "string" ||
           !Number.isInteger(event.contentIndex) ||
           event.contentIndex < 0 ||
           event.contentIndex > 10000
