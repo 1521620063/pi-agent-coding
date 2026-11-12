@@ -32,8 +32,8 @@ wa-icon {
 }
 header {
   position: relative;
-  gap: 3px;
-  padding: 8px 12px 8px 16px;
+  gap: 2px;
+  padding: 6px 10px 6px 16px;
 }
 header #title {
   margin-left: 4px;
@@ -42,8 +42,12 @@ header wa-button::part(base) {
   padding-inline: 8px;
 }
 header wa-button[aria-label]::part(base) {
-  width: 30px;
+  width: 28px;
+  min-height: 28px;
   padding: 0;
+}
+header wa-button wa-icon {
+  font-size: 17px;
 }
 wa-dropdown::part(menu) {
   padding: 5px;
@@ -178,8 +182,14 @@ wa-dropdown-item::part(checkmark) {
 }
 wa-option:state(selected),
 wa-dropdown-item:state(checked) {
-  color: var(--pi-button-text);
-  background: var(--pi-button);
+  color: var(--pi-selection-text);
+  background: var(--pi-selection);
+}
+wa-option:state(current) {
+  color: var(--pi-selection-text);
+  background: var(--pi-selection);
+  outline: 1px solid var(--pi-focus);
+  outline-offset: -1px;
 }
 wa-dropdown-item[checkbox-adjacent] {
   padding-inline-start: 1em;
@@ -202,7 +212,7 @@ wa-dropdown-item[checkbox-adjacent] {
   border-color: transparent;
 }
 #send:hover::part(base) {
-  background: var(--vscode-button-hoverBackground, var(--pi-accent));
+  background: var(--pi-button-hover);
 }
 .composer-meta {
   display: flex;
@@ -265,6 +275,9 @@ wa-dropdown-item[checkbox-adjacent] {
   max-width: 90px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+#model-menu wa-dropdown-item:state(checked)::part(details) {
+  color: inherit;
 }
 #history-popup::part(popup) {
   z-index: 100;

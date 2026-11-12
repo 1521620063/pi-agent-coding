@@ -1,4 +1,5 @@
-:root {
+:root,
+body {
   color-scheme: light dark;
   --pi-font-size: var(--vscode-font-size, 13px);
   --pi-font-content: var(--pi-font-size);
@@ -7,22 +8,26 @@
   --pi-font-code: var(--pi-font-content);
   --pi-bg: var(--vscode-sideBar-background);
   --pi-fg: var(--vscode-foreground);
-  --pi-accent: var(--vscode-textLink-foreground);
+  /* PI's parchment, terracotta and sunkissed palette, on the editor's surfaces. */
+  --pi-accent: #e1b06e;
   --pi-muted: var(--vscode-descriptionForeground);
   --pi-border: var(--vscode-panel-border);
-  --pi-user: var(--vscode-textBlockQuote-background);
+  --pi-user: color-mix(in srgb, var(--pi-accent) 6%, var(--pi-bg));
   --pi-thinking: var(--vscode-descriptionForeground);
   --pi-tool-pending: var(--vscode-editor-inactiveSelectionBackground);
   --pi-tool-success: var(--vscode-testing-iconPassed);
   --pi-tool-error: var(--vscode-errorForeground);
   --pi-diff: var(--vscode-diffEditor-insertedTextBackground);
-  --pi-focus: var(--vscode-focusBorder);
+  --pi-focus: var(--pi-accent);
   --pi-surface: var(--vscode-input-background, var(--pi-bg));
   --pi-soft: color-mix(in srgb, var(--pi-fg) 4%, var(--pi-bg));
   --pi-line: color-mix(in srgb, var(--pi-fg) 12%, var(--pi-bg));
-  --pi-hover: var(--vscode-toolbar-hoverBackground, var(--pi-soft));
-  --pi-button: var(--vscode-button-background, var(--pi-accent));
-  --pi-button-text: var(--vscode-button-foreground, var(--pi-bg));
+  --pi-hover: color-mix(in srgb, var(--pi-accent) 8%, var(--pi-bg));
+  --pi-button: #e1b06e;
+  --pi-button-text: #211a12;
+  --pi-button-hover: #edc38b;
+  --pi-selection: color-mix(in srgb, var(--pi-accent) 17%, var(--pi-surface));
+  --pi-selection-text: var(--pi-accent);
   --pi-popup-shadow: 0 6px 24px
     var(
       --vscode-widget-shadow,
@@ -85,8 +90,31 @@
   --wa-focus-ring-offset: 2px;
   --wa-border-radius-m: 6px;
 }
+.vscode-light {
+  color-scheme: light;
+  --pi-accent: #844f3b;
+  --pi-button: #844f3b;
+  --pi-button-text: #ffffff;
+  --pi-button-hover: #70402f;
+}
+.vscode-dark {
+  color-scheme: dark;
+}
 .vscode-high-contrast,
 .vscode-high-contrast-light {
+  --pi-accent: var(--vscode-textLink-foreground);
+  --pi-focus: var(--vscode-focusBorder);
+  --pi-button: var(--vscode-button-background, var(--pi-accent));
+  --pi-button-text: var(--vscode-button-foreground, var(--pi-bg));
+  --pi-button-hover: var(--vscode-button-hoverBackground, var(--pi-button));
+  --pi-selection: var(
+    --vscode-list-activeSelectionBackground,
+    var(--pi-button)
+  );
+  --pi-selection-text: var(
+    --vscode-list-activeSelectionForeground,
+    var(--pi-button-text)
+  );
   --pi-line: var(--vscode-contrastBorder, var(--pi-border));
   --wa-form-control-border-color: var(--pi-line);
 }

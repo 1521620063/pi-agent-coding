@@ -265,6 +265,27 @@ try {
           },
           { theme, colors, zoom },
         );
+        const palette = await page.evaluate(() => {
+          const style = getComputedStyle(document.body);
+          return {
+            accent: style.getPropertyValue("--pi-accent").trim(),
+            focus: style.getPropertyValue("--pi-focus").trim(),
+            selectionText: style.getPropertyValue("--pi-selection-text").trim(),
+          };
+        });
+        const expectedAccent =
+          theme === "dark"
+            ? "#e1b06e"
+            : theme === "light"
+              ? "#844f3b"
+              : colors.accent;
+        assert.equal(palette.accent, expectedAccent);
+        assert.equal(
+          palette.focus,
+          theme === "contrast" ? colors.focus : expectedAccent,
+        );
+        if (theme !== "contrast")
+          assert.equal(palette.selectionText, expectedAccent);
         await page.screenshot({
           path: join(artifacts, `${theme}-${width}-${zoom}.png`),
           fullPage: true,
@@ -327,6 +348,86 @@ try {
         );
         await page.keyboard.press("Escape");
         assert.equal(await page.locator("#settings-panel").isVisible(), false);
+        await page.locator("#mode").click();
+        await page.locator('#mode wa-option[value="followUp"]').waitFor();
+        await page.screenshot({
+          path: join(artifacts, `mode-${theme}-${width}-${zoom}.png`),
+          fullPage: true,
+          animations: "disabled",
+        });
+        const options = await page
+          .locator("#mode wa-option")
+          .evaluateAll((nodes) =>
+            nodes.map((node) => {
+              const label = node.shadowRoot.querySelector('[part="label"]');
+              const icon = node.shadowRoot.querySelector(
+                '[part="checked-icon"]',
+              );
+              const style = getComputedStyle(label);
+              return {
+                height: label.getBoundingClientRect().height,
+                lineHeight:
+                  parseFloat(style.lineHeight) *
+                  Number(document.body.style.zoom),
+                checkDisplay: getComputedStyle(icon).display,
+              };
+            }),
+          );
+        for (const option of options) {
+          assert.ok(
+            option.height <= option.lineHeight + 1,
+            `Wrapped option: ${theme} ${width} ${zoom}`,
+          );
+          assert.equal(
+            option.checkDisplay,
+            "none",
+            "Options use highlight without checkmarks",
+          );
+        }
+        await page.keyboard.press("ArrowDown");
+        await page.keyboard.press("Enter");
+        assert.equal(
+          await page.locator("#mode").evaluate((node) => node.value),
+          "steer",
+        );
+        await page.locator("#mode").click();
+        await page.mouse.move(0, 0);
+        const backgrounds = await page
+          .locator("#mode wa-option")
+          .evaluateAll((nodes) =>
+            nodes.map((node) => getComputedStyle(node).backgroundColor),
+          );
+        assert.notEqual(
+          backgrounds[0],
+          backgrounds[1],
+          "Selected option stays highlighted",
+        );
+        await page.locator('#mode wa-option[value="followUp"]').click();
+        for (const menu of ["model-menu", "thinking-menu"]) {
+          await page.locator(`#${menu} [slot="trigger"]`).click();
+          const states = await page
+            .locator(`#${menu} wa-dropdown-item`)
+            .evaluateAll((nodes) =>
+              nodes.map((node) => ({
+                checked: node.checked,
+                checkDisplay: getComputedStyle(
+                  node.shadowRoot.querySelector('[part="checkmark"]'),
+                ).display,
+                background: getComputedStyle(node).backgroundColor,
+              })),
+            );
+          assert.ok(
+            states.some(
+              (state) =>
+                state.checked && state.background !== "rgba(0, 0, 0, 0)",
+            ),
+          );
+          assert.ok(states.every((state) => state.checkDisplay === "none"));
+          await page.keyboard.press("Escape");
+          await page
+            .locator(`#${menu} [part="menu"]`)
+            .waitFor({ state: "hidden" });
+        }
       }
   }
   assert.deepEqual(failures, []);
