@@ -1,12 +1,18 @@
-﻿# PI for VS Code
+# PI
 
 在 VS Code 侧边栏中使用本机已安装的 PI coding agent，完成聊天、工具调用和会话管理，无需为日常对话打开终端。
 
 插件通过 `pi --mode rpc` 桥接本机 PI：界面与编辑器上下文由插件提供，推理、模型、工具、技能和会话仍由 PI 管理。交互组织参考 Codex / Claude Code 的侧栏方式，视觉优先参考 PI 自身的文本布局、消息配色和紧凑状态栏，并适配 VS Code 主题。
 
-当前版本为 **1.0.0 本地开发版**，通过 VSIX 安装，尚未发布到扩展市场。验证基线为 **Windows + PI 1.5.2**。
+当前版本为 **1.0.0（预览版）**，扩展标识为 `SilasPaul.pi-coding-agent`。验证基线为 **Windows + PI 1.5.2**；首次上架完成前可通过 VSIX 安装。具体变更见 [更新记录](CHANGELOG.md)。
 
 ## 界面
+
+以下为真实浏览器运行 Webview 组件的夹具截图，使用模拟会话数据，并非原生 VS Code 或真实模型运行截图。
+
+![暗色主题下的 PI 侧栏预览](media/screenshots/sidebar-dark.png)
+
+![浅色主题下的 PI 侧栏预览](media/screenshots/sidebar-light.png)
 
 当前表单已使用 Web Awesome 统一按钮、输入框、下拉菜单和开关：输入区呈现附件、箭头发送按钮以及模型与思考强度；运行中默认发送后续消息，可在队列消息旁点击“引导”。设置和命令表单提供标签及说明。控件颜色跟随 VS Code 的暗色、浅色和高对比度主题，组件、样式与图标均随插件本地打包。
 
@@ -52,9 +58,11 @@ PI 运行时显示点阵动画与 `Working`，结束后自动移除；启用系�
 
 当前仅验证 Windows 本地扩展宿主。远程、虚拟和未受信任工作区不启动 PI；macOS / Linux 尚未实测。
 
-### 2. 安装 VSIX
+### 2. 安装扩展
 
-打开 VS Code 命令面板（Windows：`Ctrl+Shift+P`），运行 **Extensions: Install from VSIX…**，选择 `pi-sidebar-1.0.0.vsix`。
+上架后，可在扩展视图中搜索 `@id:SilasPaul.pi-coding-agent`，核对发布者为 **SilasPaul** 后安装；也可通过命令 `code --install-extension SilasPaul.pi-coding-agent` 安装。首次上架前请使用下面的 VSIX 方式。
+
+打开 VS Code 命令面板（Windows：`Ctrl+Shift+P`），运行 **Extensions: Install from VSIX…**，选择 `pi-coding-agent-1.0.0.vsix`。
 
 如果从源码开始，在仓库根目录执行以下命令生成安装包：
 
@@ -66,7 +74,7 @@ npm run package
 安装包生成于仓库根目录，文件名随 `package.json` 中的版本变化。也可以用 VS Code CLI 安装已生成的包：
 
 ```powershell
-code --install-extension .\pi-sidebar-1.0.0.vsix
+code --install-extension .\pi-coding-agent-1.0.0.vsix
 ```
 
 ### 3. 连接 PI
@@ -80,7 +88,7 @@ code --install-extension .\pi-sidebar-1.0.0.vsix
 
 ## 配置
 
-在 VS Code 设置中搜索 `@ext:SilasPaul.pi-sidebar`，或从侧栏的 **⋯ → 插件设置** 进入。
+在 VS Code 设置中搜索 `@ext:SilasPaul.pi-coding-agent`，或从侧栏的 **⋯ → 插件设置** 进入。
 
 | 设置                   | 默认值                      | 说明                                                                           |
 | ---------------------- | --------------------------- | ------------------------------------------------------------------------------ |
@@ -229,6 +237,7 @@ npm run compile
 | 命令                       | 作用                                                   |
 | -------------------------- | ------------------------------------------------------ |
 | `npm run check`            | TypeScript 类型检查                                    |
+| `npm run validate`         | 类型检查、单元测试和模拟 PI 进程集成测试               |
 | `npm test`                 | 单元测试                                               |
 | `npm run test:integration` | 模拟 PI 子进程的集成测试                               |
 | `npm run test:vscode`      | 真实 VS Code 扩展宿主测试，使用模拟 PI                 |
@@ -238,10 +247,18 @@ npm run compile
 
 `test:vscode` 使用隔离的测试配置、扩展目录和临时工作区；Windows 下优先使用本机 VS Code，也可通过 `PI_TEST_VSCODE` 指定可执行文件。没有可用本机路径时，测试工具可能下载 VS Code。测试宿主中的模拟 PI 通过不代表真实模型或 MCP 验收通过。
 
-`test:webview` 使用现有 Playwright Core，本机 Windows 优先查找 Edge / Chrome，也可通过 `PI_TEST_BROWSER` 指定浏览器路径。截图输出到系统临时目录，属于浏览器夹具，不是原生 VS Code 截图。本轮新增能力已覆盖单元测试、模拟进程和原生 VS Code API；新增功能的真实模型生成、真实扩展交互及完整历史数据尚未端到端验收。安装包不会随源码构建自动更新，需运行 `npm run package` 重新生成 VSIX。
+`test:webview` 使用现有 Playwright Core，本机 Windows 优先查找 Edge / Chrome，也可通过 `PI_TEST_BROWSER` 指定浏览器路径。截图输出到系统临时目录，属于浏览器夹具，不是原生 VS Code 截图。自动测试覆盖单元行为、模拟进程和原生 VS Code API；真实模型生成、真实扩展交互及完整历史数据尚未端到端验收。
+
+`npm run package` 和 VS Code 发布前钩子会先执行 `validate`，任一检查失败即停止。构建会根据依赖生成 `THIRD_PARTY_NOTICES.txt` 并随包分发，缺少依赖许可全文时会报错。VS Code 宿主和浏览器测试需在发布前另行运行。安装包不会随源码构建自动更新，需运行 `npm run package` 重新生成 VSIX。
 
 核心代码分为三部分：`webview/` 提供界面，`src/pi/` 管理启动与 JSONL RPC，`src/features/` 连接编辑器、附件、会话和扩展交互。Webview 无法直接读取本机文件、启动进程或连接模型供应商。
 
+## 隐私与反馈
+
+消息与所选附件交给本机 PI；PI 可能按你的供应商配置将内容发送到外部模型服务。插件不另外保存供应商凭证，也不包含分析遥测。会话索引、草稿及 PI 会话的存储范围见 [隐私说明](PRIVACY.md)。
+
+问题和建议请提交到本仓库的 [Issues](https://github.com/1521620063/PI-Extension/issues)，附上扩展、VS Code、PI 版本及复现步骤。请在分享诊断前移除凭证、私人路径和会话内容。
+
 ## 许可证
 
-[MIT](LICENSE)。本仓库许可证适用于插件代码；本机安装的 PI 及相关服务遵循其各自的许可与条款。
+[MIT](LICENSE)。本仓库许可证适用于插件代码；打包依赖的许可与版权声明见 [第三方许可](THIRD_PARTY_NOTICES.txt)。本机安装的 PI 及相关服务遵循其各自的许可与条款。

@@ -1,9 +1,10 @@
 {
-  "name": "pi-sidebar",
+  "name": "pi-coding-agent",
   "displayName": "PI",
   "description": "A native-feeling VS Code sidebar for your locally installed PI coding agent.",
   "version": "1.0.0",
   "publisher": "SilasPaul",
+  "preview": true,
   "license": "MIT",
   "icon": "media/icon.png",
   "galleryBanner": {
@@ -27,6 +28,10 @@
   "engines": {
     "vscode": "^1.106.0"
   },
+  "bugs": {
+    "url": "https://github.com/1521620063/PI-Extension/issues"
+  },
+  "homepage": "https://github.com/1521620063/PI-Extension#readme",
   "categories": [
     "AI",
     "Other"
@@ -160,8 +165,9 @@
     "test:integration": "vitest run tests/integration",
     "test:vscode": "node scripts/test-vscode.mjs",
     "test:webview": "npm run compile && node scripts/test-webview.mjs",
-    "package": "npm run compile && vsce package --no-dependencies --allow-missing-repository",
-    "vscode:prepublish": "npm run compile"
+    "validate": "npm run check && npm test && npm run test:integration",
+    "package": "vsce package --no-dependencies",
+    "vscode:prepublish": "npm run validate && npm run compile"
   },
   "devDependencies": {
     "@types/markdown-it": "^14.2.0",
@@ -177,6 +183,12 @@
     "prettier": "^3.9.10",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1",
+    "mocha": {
+      "glob": "^14.0.2"
+    }
   },
   "dependencies": {
     "@awesome.me/webawesome": "3.14.0",

@@ -1,0 +1,48 @@
+import { expect, it, vi } from "vitest";
+import { ContextService } from "../../src/features/context";
+import { SessionStore } from "../../src/state/session-store";
+it("retains unknown context usage and zero cost without inventing a value", async () => {
+  const store = new SessionStore();
+  const service = new ContextService(
+    {
+      request: async () => ({
+        cost: 0,
+        contextUsage: { tokens: null, percent: null, contextWindow: 100 },
+      }),
+    } as any,
+    store,
+  );
+  await service.refreshStats();
+  expect(store.getSnapshot().stats).toMatchObject({
+    cost: 0,
+    contextUsage: { tokens: null, percent: null },
+  });
+});
+it("ignores late statistics from a previous session", async () => {
+  const store = new SessionStore();
+  store.update({ session: { id: "a" } });
+  let done!: (value: any) => void;
+  const request = () =>
+    new Promise((resolve) => {
+      done = resolve;
+    });
+  const service = new ContextService({ request } as any, store);
+  const refreshing = service.refreshStats();
+  store.update({ session: { id: "b" } });
+  done({ cost: 12 });
+  await refreshing;
+  expect(store.getSnapshot().stats).toBeUndefined();
+});
+it("uses a long-running compact request and clears active state on failure", async () => {
+  const store = new SessionStore();
+  const request = vi.fn(async () => {
+    throw new Error("compact failed");
+  });
+  const service = new ContextService({ request } as any, store);
+  await expect(service.compact("keep filenames")).rejects.toThrow();
+  expect(request).toHaveBeenCalledWith(
+    { type: "compact", customInstructions: "keep filenames" },
+    { timeoutMs: 0 },
+  );
+  expect(store.getSnapshot().compaction.active).toBe(false);
+});

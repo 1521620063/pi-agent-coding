@@ -1,5 +1,6 @@
 import { build, context } from "esbuild";
 import { mkdir, copyFile } from "node:fs/promises";
+import { writeThirdPartyNotices } from "./scripts/third-party-notices.mjs";
 await mkdir("dist", { recursive: true });
 const configs = [
   {
@@ -19,11 +20,25 @@ const configs = [
     minify: true,
   },
 ];
+const metafiles = new Map();
 for (const options of configs) {
   const config = {
     bundle: true,
     sourcemap: true,
     logLevel: "info",
+    metafile: true,
+    plugins: [
+      {
+        name: "third-party-notices",
+        setup(builder) {
+          builder.onEnd(async (result) => {
+            if (result.errors.length || !result.metafile) return;
+            metafiles.set(options.outfile, result.metafile);
+            await writeThirdPartyNotices([...metafiles.values()]);
+          });
+        },
+      },
+    ],
     ...options,
   };
   if (process.argv.includes("--watch")) await (await context(config)).watch();

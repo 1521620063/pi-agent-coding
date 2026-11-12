@@ -258,7 +258,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (action.type === "settings")
           await vscode.commands.executeCommand(
             "workbench.action.openSettings",
-            "@ext:pi-extension.pi-sidebar",
+            `@ext:${context.extension.id}`,
           );
         if (action.type === "send") {
           if (action.text.startsWith("!")) {
