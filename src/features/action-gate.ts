@@ -12,6 +12,7 @@ const transitions = new Set([
   "forkMessage",
   "cycleModel",
   "cycleThinking",
+  "promoteQueued",
 ]);
 const blocked = new Set([
   ...transitions,
@@ -20,11 +21,23 @@ const blocked = new Set([
   "shell",
   "renameSession",
   "queueMode",
+  "clearQueue",
 ]);
 export class ActionGate {
   private changing = false;
   private transition?: string;
+  private stopping = 0;
   async run<T>(type: string, action: () => Promise<T>): Promise<T> {
+    if (this.stopping && blocked.has(type))
+      throw new Error("正在停止当前任务，请稍候再发送或切换会话。");
+    if (type === "stop") {
+      this.stopping++;
+      try {
+        return await action();
+      } finally {
+        this.stopping--;
+      }
+    }
     if (this.transition === "connect" && type === "disconnect") return action();
     if (this.changing && blocked.has(type))
       throw new Error(

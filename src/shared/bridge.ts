@@ -39,6 +39,12 @@ export interface ViewState {
   messages: AgentMessage[];
   tools: ToolView[];
   queues: { steering: string[]; followUp: string[] };
+  queueControl?: {
+    revision: number;
+    busy: boolean;
+    canSteer: boolean;
+    reason?: string;
+  };
   queueModes?: {
     steering?: "all" | "one-at-a-time";
     followUp?: "all" | "one-at-a-time";
@@ -117,6 +123,7 @@ export type ClientAction =
         | "cycleThinking";
     }
   | { type: "forkMessage"; index: number }
+  | { type: "promoteQueued"; index: number; revision: number }
   | { type: "copyText"; text: string }
   | { type: "openCode"; text: string; language: string }
   | {
@@ -171,6 +178,15 @@ const simple = new Set([
 export function parseClientAction(value: unknown): ClientAction | undefined {
   if (!isObject(value) || typeof value.type !== "string") return;
   const keys = Object.keys(value);
+  if (
+    value.type === "promoteQueued" &&
+    keys.length === 3 &&
+    Number.isSafeInteger(value.index) &&
+    value.index >= 0 &&
+    Number.isSafeInteger(value.revision) &&
+    value.revision >= 0
+  )
+    return value as ClientAction;
   if (
     value.type === "forkMessage" &&
     keys.length === 2 &&

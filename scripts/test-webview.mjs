@@ -144,17 +144,37 @@ try {
   const prompt = page.locator("#prompt textarea");
   assert.equal(await prompt.inputValue(), "保留草稿");
   assert.equal(
+    await page.locator("#mode").count(),
+    0,
+    "Sending no longer requires a mode selector",
+  );
+  assert.equal(
     await page.locator('[data-action="attachSelection"]').count(),
     0,
   );
   assert.equal(await page.locator("#settings-panel").isVisible(), false);
   await page.locator("#settings-toggle").click();
   await page.locator("#settings-panel").waitFor();
+  assert.equal(
+    await page.locator("#queue-settings").evaluate((node) => node.open),
+    false,
+  );
+  assert.equal(await page.locator("#followUp-mode").isVisible(), false);
   await page.locator("#auto-retry [part=control]").click();
   await page.waitForFunction(() => window.actions.at(-1)?.type === "autoRetry");
   assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
     type: "autoRetry",
     enabled: true,
+  });
+  await page.locator("#queue-settings > summary").focus();
+  await page.keyboard.press("Enter");
+  assert.equal(await page.locator("#followUp-mode").isVisible(), true);
+  await page.locator("#followUp-mode").click();
+  await page.locator('#followUp-mode wa-option[value="one-at-a-time"]').click();
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "queueMode",
+    channel: "followUp",
+    mode: "one-at-a-time",
   });
   await page.locator("#steering-mode").click();
   await page.keyboard.press("Escape");
@@ -166,6 +186,10 @@ try {
     channel: "steering",
     mode: "all",
   });
+  await page.locator("#queue-settings > summary").focus();
+  await page.keyboard.press("Space");
+  assert.equal(await page.locator("#steering-mode").isVisible(), false);
+  await page.keyboard.press("Enter");
   await page.keyboard.press("Escape");
   assert.equal(await page.locator("#settings-panel").isVisible(), false);
   assert.equal(
@@ -217,6 +241,116 @@ try {
     window.deliver({ type: "sent", attachmentIds: [] }),
   );
   assert.equal(await prompt.inputValue(), "新草稿");
+  await page.evaluate(() => {
+    window.fixtureState = {
+      ...window.fixtureState,
+      run: "running",
+      queues: {
+        steering: ["已有补充"],
+        followUp: ["先检查协议", "完成后更新说明"],
+      },
+      queueControl: { revision: 7, busy: false, canSteer: true },
+    };
+    window.deliver({ type: "snapshot", state: window.fixtureState });
+  });
+  assert.equal(await page.locator("#queue [data-steer-index]").count(), 2);
+  await prompt.fill("运行中发送");
+  await prompt.press("Enter");
+  assert.equal(
+    await page.evaluate(() => window.actions.at(-1).mode),
+    "followUp",
+  );
+  await page.evaluate(() => {
+    window.deliver({ type: "snapshot", state: window.fixtureState });
+    window.deliver({ type: "sent", attachmentIds: [] });
+  });
+  assert.equal(
+    await page
+      .locator('#queue [data-steer-index="0"]')
+      .evaluate((node) => node.disabled),
+    false,
+    "A completed send must re-enable steering without another snapshot",
+  );
+  await prompt.fill("新草稿");
+  await page.locator('#queue [data-steer-index="0"]').click();
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "promoteQueued",
+    index: 0,
+    revision: 7,
+  });
+  assert.equal(
+    await prompt.inputValue(),
+    "新草稿",
+    "Steering must preserve a new draft",
+  );
+  assert.equal(
+    await page
+      .locator('#queue [data-steer-index="0"]')
+      .evaluate((node) => node.disabled),
+    true,
+  );
+  await page.evaluate(() => {
+    window.fixtureState = {
+      ...window.fixtureState,
+      queues: {
+        steering: ["已有补充", "先检查协议"],
+        followUp: ["完成后更新说明"],
+      },
+      queueControl: { revision: 8, busy: false, canSteer: true },
+    };
+    window.deliver({ type: "snapshot", state: window.fixtureState });
+  });
+  assert.equal(await page.locator("#queue [data-steer-index]").count(), 1);
+  await page.locator('#queue [data-steer-index="0"]').focus();
+  await page.keyboard.press("Enter");
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "promoteQueued",
+    index: 0,
+    revision: 8,
+  });
+  await page.evaluate(() => {
+    window.fixtureState = {
+      ...window.fixtureState,
+      queueControl: {
+        revision: 8,
+        busy: false,
+        canSteer: false,
+        reason: "队列含图片，暂不支持引导。",
+      },
+    };
+    window.deliver({ type: "snapshot", state: window.fixtureState });
+  });
+  assert.equal(
+    await page
+      .locator('#queue [data-steer-index="0"]')
+      .evaluate((node) => node.disabled),
+    true,
+  );
+  assert.match(await page.locator("#queue").textContent(), /图片/);
+  await page.evaluate(() => {
+    window.fixtureState = {
+      ...window.fixtureState,
+      queueControl: { revision: 8, busy: true, canSteer: false },
+    };
+    window.deliver({ type: "snapshot", state: window.fixtureState });
+  });
+  assert.equal(
+    await page.locator("#send").evaluate((node) => node.disabled),
+    true,
+  );
+  assert.equal(
+    await page
+      .locator('[data-action="stop"]')
+      .evaluate((node) => node.disabled),
+    false,
+  );
+  await page.evaluate(() => {
+    window.fixtureState = {
+      ...window.fixtureState,
+      queueControl: { revision: 9, busy: false, canSteer: true },
+    };
+    window.deliver({ type: "snapshot", state: window.fixtureState });
+  });
   await page.locator("[data-copy-text]").last().click();
   assert.equal(
     await page.evaluate(() => window.actions.at(-1).type),
@@ -351,9 +485,7 @@ try {
             .querySelector(".composer")
             .getBoundingClientRect();
           return [
-            ...document.querySelectorAll(
-              ".attach-actions wa-button, #mode, #send",
-            ),
+            ...document.querySelectorAll(".attach-actions wa-button, #send"),
           ]
             .filter((node) => {
               const bounds = node.getBoundingClientRect();
@@ -384,61 +516,31 @@ try {
         );
         await page.keyboard.press("Escape");
         assert.equal(await page.locator("#settings-panel").isVisible(), false);
-        await page.locator("#mode").click();
-        await page.locator('#mode wa-option[value="followUp"]').waitFor();
-        await page.screenshot({
-          path: join(artifacts, `mode-${theme}-${width}-${zoom}.png`),
-          fullPage: true,
-          animations: "disabled",
+        const steer = page.locator('#queue [data-steer-index="0"]');
+        await steer.scrollIntoViewIfNeeded();
+        assert.equal(await steer.isVisible(), true);
+        const rowLayout = await steer.evaluate((node) => {
+          const row = node.closest(".queue-item");
+          const text = row.querySelector(".queue-text").getBoundingClientRect();
+          const button = node.shadowRoot
+            .querySelector('[part~="base"]')
+            .getBoundingClientRect();
+          return {
+            display: getComputedStyle(row).display,
+            textTop: text.top,
+            buttonTop: button.top,
+          };
         });
-        const options = await page
-          .locator("#mode wa-option")
-          .evaluateAll((nodes) =>
-            nodes.map((node) => {
-              const label = node.shadowRoot.querySelector('[part="label"]');
-              const icon = node.shadowRoot.querySelector(
-                '[part="checked-icon"]',
-              );
-              const style = getComputedStyle(label);
-              return {
-                height: label.getBoundingClientRect().height,
-                lineHeight:
-                  parseFloat(style.lineHeight) *
-                  Number(document.body.style.zoom),
-                checkDisplay: getComputedStyle(icon).display,
-              };
-            }),
-          );
-        for (const option of options) {
-          assert.ok(
-            option.height <= option.lineHeight + 1,
-            `Wrapped option: ${theme} ${width} ${zoom}`,
-          );
-          assert.equal(
-            option.checkDisplay,
-            "none",
-            "Options use highlight without checkmarks",
-          );
-        }
-        await page.keyboard.press("ArrowDown");
-        await page.keyboard.press("Enter");
-        assert.equal(
-          await page.locator("#mode").evaluate((node) => node.value),
-          "steer",
+        assert.equal(rowLayout.display, "flex");
+        assert.ok(
+          Math.abs(rowLayout.textTop - rowLayout.buttonTop) < 5,
+          "Steer must sit beside the text",
         );
-        await page.locator("#mode").click();
-        await page.mouse.move(0, 0);
-        const backgrounds = await page
-          .locator("#mode wa-option")
-          .evaluateAll((nodes) =>
-            nodes.map((node) => getComputedStyle(node).backgroundColor),
-          );
-        assert.notEqual(
-          backgrounds[0],
-          backgrounds[1],
-          "Selected option stays highlighted",
+        const bounds = await steer.boundingBox();
+        assert.ok(
+          bounds && bounds.x >= 0 && bounds.x + bounds.width <= width + 1,
+          `Steering button overflow: ${theme} ${width} ${zoom}`,
         );
-        await page.locator('#mode wa-option[value="followUp"]').click();
         for (const menu of ["model-menu", "thinking-menu"]) {
           await page.locator(`#${menu} [slot="trigger"]`).click();
           const states = await page

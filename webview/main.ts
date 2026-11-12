@@ -36,6 +36,7 @@ const restored = vscode.getState();
 prompt.value = restored?.draft ?? "";
 let state: ViewState | undefined;
 let submitting = false;
+let promotingRevision: number | undefined;
 let submittedText = "";
 let editorRevision = restored?.editorRevision ?? 0;
 let composing = false;
@@ -140,6 +141,8 @@ function send() {
     !state ||
     state.connection !== "connected" ||
     submitting ||
+    state.queueControl?.busy ||
+    promotingRevision !== undefined ||
     composer.isAttaching ||
     composing ||
     (!promptText().trim() && !state.attachments.length)
@@ -154,12 +157,15 @@ function send() {
     type: "send",
     text: submittedText,
     attachmentIds: state.attachments.map((a) => a.id),
-    mode: byId<FormSelect>("mode").value === "steer" ? "steer" : "followUp",
+    mode: "followUp",
   });
 }
 function updateSend() {
   byId<FormButton>("send").disabled =
-    submitting || state?.connection !== "connected";
+    submitting ||
+    !!state?.queueControl?.busy ||
+    promotingRevision !== undefined ||
+    state?.connection !== "connected";
 }
 window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
   if (data.type === "fileCandidates" || data.type === "contextAttached") {
@@ -173,10 +179,17 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
     saveDraft();
     renderCommands();
     updateSend();
+    renderQueue();
     return;
   }
   if (data.type !== "snapshot") return;
   state = data.state;
+  if (
+    state.error ||
+    state.queueControl?.revision !== promotingRevision ||
+    state.queueControl?.busy
+  )
+    promotingRevision = undefined;
   selections.render(state);
   if (state.error) submitting = false;
   renderChat(
@@ -225,6 +238,9 @@ function renderState() {
   connection.hidden = state.connection === "connected";
   byId("stop").hidden = state.run === "idle" && !state.compaction.active;
   byId("run-controls").hidden = byId("stop").hidden;
+  byId("queue-send-hint").hidden = state.run !== "running";
+  byId("send").title =
+    state.run === "running" ? "发送后续消息 · Enter" : "发送消息 · Enter";
   byId("model-name").textContent =
     state.model?.name ?? state.model?.id ?? "选择模型";
   byId("thinking-name").textContent = state.thinkingLevel ?? "思考";
@@ -335,24 +351,7 @@ function renderState() {
     attachments.append(
       element("p", "error", "当前模型不支持图片，请切换模型或移除图片。"),
     );
-  const queue = byId("queue");
-  queue.replaceChildren();
-  queue.hidden = !state.queues.steering.length && !state.queues.followUp.length;
-  for (const [kind, items] of Object.entries(state.queues))
-    for (const text of items)
-      queue.append(
-        element(
-          "div",
-          "queue-item",
-          `${kind === "steering" ? "补充指示" : "后续消息"} · ${text}`,
-        ),
-      );
-  if (!queue.hidden) {
-    queue.append(element("small", "muted", "补充指示在当前工具完成后处理。"));
-    const clear = formButton("清空并恢复到输入框");
-    clear.onclick = () => post({ type: "clearQueue" });
-    queue.append(clear);
-  }
+  renderQueue();
   for (const placement of ["aboveEditor", "belowEditor"]) {
     const target = byId(
       placement === "aboveEditor" ? "widgets-above" : "widgets-below",
@@ -375,6 +374,60 @@ function renderState() {
     .filter(Boolean)
     .join("\n");
   renderCommands();
+}
+function renderQueue() {
+  if (!state) return;
+  const queue = byId("queue");
+  queue.replaceChildren();
+  queue.hidden = !state.queues.steering.length && !state.queues.followUp.length;
+  for (const [kind, items] of Object.entries(state.queues))
+    items.forEach((text, index) => {
+      const row = element("div", "queue-item");
+      row.append(
+        element(
+          "span",
+          "queue-text",
+          `${kind === "steering" ? "补充指示" : "后续消息"} · ${text}`,
+        ),
+      );
+      if (kind === "followUp") {
+        const control = state!.queueControl;
+        const steer = formButton("引导", "queue-steer");
+        steer.dataset.steerIndex = String(index);
+        steer.disabled =
+          !control?.canSteer || submitting || promotingRevision !== undefined;
+        steer.title =
+          control?.reason ??
+          "转为补充指示；仅适用于未被输入扩展改变的纯文本，输入扩展会再次执行";
+        steer.setAttribute("aria-label", `引导第 ${index + 1} 条后续消息`);
+        steer.onclick = () => {
+          if (steer.disabled || !control) return;
+          promotingRevision = control.revision;
+          for (const button of queue.querySelectorAll<FormButton>("wa-button"))
+            button.disabled = true;
+          updateSend();
+          post({ type: "promoteQueued", index, revision: control.revision });
+        };
+        row.append(steer);
+      }
+      queue.append(row);
+    });
+  if (!queue.hidden) {
+    const control = state.queueControl;
+    queue.append(
+      element(
+        "small",
+        "muted queue-hint",
+        control?.reason ??
+          "仅适用于纯文本；输入扩展会再次执行，请勿用于扩展自动添加图片的队列。",
+      ),
+    );
+    const clear = formButton("清空并恢复到输入框");
+    clear.disabled =
+      !!control?.busy || submitting || promotingRevision !== undefined;
+    clear.onclick = () => post({ type: "clearQueue" });
+    queue.append(clear);
+  }
 }
 function renderCommands() {
   if (!composing) composer.refresh();

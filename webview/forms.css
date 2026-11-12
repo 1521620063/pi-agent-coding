@@ -133,48 +133,11 @@ footer {
 .input-actions wa-button::part(base) {
   padding-inline: 7px;
 }
-#mode {
-  width: calc(4em + 25px);
-  font-size: var(--pi-font-small);
-  --wa-form-control-background-color: transparent;
-  --wa-form-control-border-color: transparent;
-  --wa-form-control-padding-inline: 4px;
-  --wa-form-control-height: 30px;
-  --wa-form-control-value-color: var(--pi-muted);
-}
-#mode::part(combobox) {
-  box-shadow: none;
-  gap: 0;
-}
-#mode::part(expand-icon) {
-  width: 10px;
-  font-size: 10px;
-  margin-inline-start: 3px;
-}
-#mode:hover::part(combobox) {
-  background: var(--pi-hover);
-}
-#mode::part(display-input) {
-  font-size: var(--pi-font-small);
-  flex: 0 0 auto;
-  width: 4em;
-  padding: 0;
-}
-#mode::part(listbox) {
-  min-width: calc(4em + 32px);
-  padding: 5px;
-  border-radius: 8px;
-  border-color: var(--pi-line);
-  box-shadow: var(--pi-popup-shadow);
-}
 wa-option::part(label) {
   font-size: var(--pi-font-small);
 }
 wa-option {
   padding-inline: 10px;
-}
-#mode wa-option::part(label) {
-  white-space: nowrap;
 }
 wa-option::part(checked-icon),
 wa-dropdown-item::part(checkmark) {
@@ -424,6 +387,22 @@ wa-switch::part(hint) {
   border-top: 1px solid var(--pi-line);
   font-size: var(--pi-font-compact);
 }
+#queue-settings > summary {
+  cursor: pointer;
+  font-size: var(--pi-font-small);
+}
+.queue-settings-fields {
+  display: grid;
+  gap: 12px;
+  padding-top: 10px;
+  min-width: 0;
+}
+.queue-settings-fields > p {
+  margin: 0;
+  font-size: var(--pi-font-compact);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
 #shell-panel {
   flex-shrink: 0;
   max-height: 42vh;
@@ -580,4 +559,30 @@ wa-button.command-option::part(label) {
 }
 .conversation-search {
   margin: 4px 12px;
+}
+
+.queue-item {
+  display: flex;
+  align-items: flex-start;
+  white-space: normal;
+  gap: 8px;
+  padding-block: 3px;
+}
+.queue-text {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--pi-font-small);
+}
+.queue-steer {
+  flex: 0 0 auto;
+}
+.queue-steer::part(base) {
+  white-space: nowrap;
+}
+.queue-hint {
+  display: block;
+  margin-block: 4px;
+  overflow-wrap: anywhere;
 }

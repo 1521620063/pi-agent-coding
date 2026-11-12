@@ -252,6 +252,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (action.type === "connect") await connect();
         if (action.type === "disconnect") {
           ui.dispose();
+          await queues.cancelPromotion();
           await controller.disconnect();
         }
         if (action.type === "settings")
@@ -318,6 +319,8 @@ export function activate(context: vscode.ExtensionContext) {
           await history.forkMessage(action.index);
         if (action.type === "queueMode")
           await queues.setMode(action.channel, action.mode);
+        if (action.type === "promoteQueued")
+          await queues.promote(action.index, action.revision);
         if (action.type === "cycleModel") await models.cycleModel();
         if (action.type === "cycleThinking") await models.cycleThinking();
         if (action.type === "openScm")
@@ -346,20 +349,18 @@ export function activate(context: vscode.ExtensionContext) {
         }
         if (action.type === "showCommands") {
           const selected = await vscode.window.showQuickPick(
-            store
-              .getSnapshot()
-              .commands.map((command) => ({
-                label: `/${command.name}`,
-                description: [
-                  command.source,
-                  command.sourceInfo?.scope,
-                  command.sourceInfo?.origin,
-                ]
-                  .filter(Boolean)
-                  .join(" · "),
-                detail: command.sourceInfo?.path ?? "PI 未提供可查看的来源路径",
-                command,
-              })),
+            store.getSnapshot().commands.map((command) => ({
+              label: `/${command.name}`,
+              description: [
+                command.source,
+                command.sourceInfo?.scope,
+                command.sourceInfo?.origin,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+              detail: command.sourceInfo?.path ?? "PI 未提供可查看的来源路径",
+              command,
+            })),
             {
               title: "PI 技能与模板来源",
               matchOnDescription: true,
@@ -435,7 +436,22 @@ export function activate(context: vscode.ExtensionContext) {
         }
         if (action.type === "chooseThinking")
           await models.setThinking(action.level);
-        if (action.type === "stop") await controller.stopAll();
+        if (action.type === "stop") {
+          const uncertain = await queues.cancelPromotion();
+          try {
+            await controller.stopAll();
+          } finally {
+            if (uncertain) {
+              // Aborting a local request does not cancel PI's input preflight.
+              // Close our process so it cannot enqueue a late replay after abort.
+              await controller.disconnect();
+              store.update({
+                error:
+                  "引导提交尚未确认，已断开 PI 以阻止延迟执行。请检查对话后重新连接；未提交的文本已恢复到输入框。",
+              });
+            }
+          }
+        }
         if (action.type === "openLink")
           await vscode.env.openExternal(vscode.Uri.parse(action.url));
         if (action.type === "newSession" || action.type === "openSession") {
@@ -567,6 +583,7 @@ export function activate(context: vscode.ExtensionContext) {
         stopNotifications();
         ui.dispose();
         shell.dispose();
+        queues.dispose();
         void controller.disconnect();
       },
     },

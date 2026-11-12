@@ -18,8 +18,10 @@ export function createSidebarProvider(
   } {
   let view: vscode.WebviewView | undefined;
   const disposables: vscode.Disposable[] = [];
-  const unsubscribe = store.subscribe((state) => {
-    if (view) void view.webview.postMessage(snapshotMessage(state));
+  const unsubscribe = store.subscribe(() => {
+    // Another subscriber may derive queue controls synchronously during this event.
+    if (view)
+      void view.webview.postMessage(snapshotMessage(store.getSnapshot()));
   });
   return {
     get isVisible() {

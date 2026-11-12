@@ -32,14 +32,20 @@ export const sidebarMarkup = `
     </section>
   </wa-popup>
   <div id="settings-popup">
-    <wa-button id="settings-toggle" size="s" appearance="plain" variant="neutral" aria-label="设置" aria-haspopup="dialog" aria-expanded="false" aria-controls="settings-panel" title="设置：上下文与重试"><wa-icon name="gear"></wa-icon></wa-button>
+    <wa-button id="settings-toggle" size="s" appearance="plain" variant="neutral" aria-label="设置" aria-haspopup="dialog" aria-expanded="false" aria-controls="settings-panel" title="PI 设置"><wa-icon name="gear"></wa-icon></wa-button>
     <section id="settings-panel" role="dialog" aria-label="PI 设置" tabindex="-1" hidden>
-      <div class="settings-heading"><strong>上下文与重试</strong><wa-button id="settings-close" size="s" appearance="plain" variant="neutral" aria-label="关闭设置" title="关闭设置"><wa-icon name="xmark"></wa-icon></wa-button></div>
+      <div class="settings-heading"><strong>PI 设置</strong><wa-button id="settings-close" size="s" appearance="plain" variant="neutral" aria-label="关闭设置" title="关闭设置"><wa-icon name="xmark"></wa-icon></wa-button></div>
     <div class="settings-fields">
       <wa-switch id="auto-compaction" size="s" hint="由 PI 在需要时整理会话上下文">自动压缩</wa-switch>
       <wa-switch id="auto-retry" size="s" hint="使用 PI 自身的自动重试设置">自动重试<span id="retry-known"></span></wa-switch>
-      <wa-select id="steering-mode" size="s" label="补充指示处理方式" value=""><wa-option value="">PI 设置未知</wa-option><wa-option value="one-at-a-time">逐条处理</wa-option><wa-option value="all">一次处理全部</wa-option></wa-select>
-      <wa-select id="followUp-mode" size="s" label="后续消息处理方式" value=""><wa-option value="">PI 设置未知</wa-option><wa-option value="one-at-a-time">逐条处理</wa-option><wa-option value="all">一次处理全部</wa-option></wa-select>
+      <details id="queue-settings">
+        <summary>队列处理（高级）</summary>
+        <div class="queue-settings-fields">
+          <p class="muted">仅控制 PI 每次取出一条还是全部。默认发送仍为后续消息，点击“引导”后进入引导队列。</p>
+          <wa-select id="followUp-mode" size="s" label="后续队列处理方式" value=""><wa-option value="">PI 设置未知</wa-option><wa-option value="one-at-a-time">逐条处理</wa-option><wa-option value="all">一次处理全部</wa-option></wa-select>
+          <wa-select id="steering-mode" size="s" label="引导队列处理方式" value=""><wa-option value="">PI 设置未知</wa-option><wa-option value="one-at-a-time">逐条处理</wa-option><wa-option value="all">一次处理全部</wa-option></wa-select>
+        </div>
+      </details>
       <div class="settings-action"><span class="muted">立即整理当前会话</span><wa-button data-action="compact" size="s" appearance="outlined" variant="neutral">手动压缩</wa-button></div>
     </div>
       <wa-button data-action="settings" size="s" appearance="plain" variant="neutral">打开 VS Code 插件设置…</wa-button>
@@ -72,12 +78,11 @@ export const sidebarMarkup = `
     </div>
       </div>
       <div class="send-actions">
-        <wa-select id="mode" value="followUp" size="s" appearance="outlined" aria-label="运行时发送方式" placement="top"><wa-option value="followUp">后续消息</wa-option><wa-option value="steer">补充指示</wa-option></wa-select>
         <wa-button id="send" size="s" variant="brand" appearance="accent" aria-label="发送消息" title="发送消息 · Enter" disabled><wa-icon name="arrow-up"></wa-icon></wa-button>
       </div>
     </div>
   </div>
-  <div class="statusline composer-hint"><span>Enter 发送 · Shift+Enter 换行</span><span id="usage"></span></div>
+  <div class="statusline composer-hint"><span>Enter 发送 · Shift+Enter 换行<span id="queue-send-hint" hidden> · 运行中默认排队</span></span><span id="usage"></span></div>
   <div class="statusline" id="statuses" hidden></div>
 
 </footer>
