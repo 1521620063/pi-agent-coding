@@ -157,6 +157,7 @@ footer {
   padding: 0;
 }
 #mode::part(listbox) {
+  min-width: calc(4em + 32px);
   padding: 5px;
   border-radius: 8px;
   border-color: var(--pi-line);
@@ -164,6 +165,24 @@ footer {
 }
 wa-option::part(label) {
   font-size: var(--pi-font-small);
+}
+wa-option {
+  padding-inline: 10px;
+}
+#mode wa-option::part(label) {
+  white-space: nowrap;
+}
+wa-option::part(checked-icon),
+wa-dropdown-item::part(checkmark) {
+  display: none;
+}
+wa-option:state(selected),
+wa-dropdown-item:state(checked) {
+  color: var(--pi-button-text);
+  background: var(--pi-button);
+}
+wa-dropdown-item[checkbox-adjacent] {
+  padding-inline-start: 1em;
 }
 .input-actions #send {
   flex: 0 0 28px;
