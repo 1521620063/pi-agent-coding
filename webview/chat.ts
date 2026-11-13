@@ -67,6 +67,10 @@ interface CachedNode {
 interface ActivityNode {
   node: HTMLDetailsElement;
   summary: HTMLElement;
+  label: HTMLElement;
+  count: HTMLElement;
+  failure: HTMLElement;
+  current: HTMLElement;
   body: HTMLElement;
 }
 interface ChatCache {
@@ -193,9 +197,30 @@ export function renderChat(
       if (!cached) {
         const details = element("details", "execution");
         const summary = element("summary", "execution-summary");
+        const icon = element("span", "execution-icon");
+        icon.setAttribute("aria-hidden", "true");
+        const heading = element("span", "execution-heading");
+        const labels = element("span", "execution-labels");
+        const label = element("span", "execution-label");
+        const count = element("span", "execution-count");
+        const failure = element("span", "execution-failure");
+        const current = element("span", "execution-current");
+        const chevron = element("span", "execution-chevron");
+        chevron.setAttribute("aria-hidden", "true");
+        labels.append(label, count, failure);
+        heading.append(labels, current);
+        summary.append(icon, heading, chevron);
         const body = element("div", "execution-body");
         details.append(summary, body);
-        cached = { node: details, summary, body };
+        cached = {
+          node: details,
+          summary,
+          label,
+          count,
+          failure,
+          current,
+          body,
+        };
         cache.activities.set(key, cached);
       }
       children.push(cached.node);
@@ -299,14 +324,29 @@ export function renderChat(
       : pending.length
         ? "正在执行"
         : "执行过程";
-    const count = records.length ? ` · ${records.length} 项操作` : "";
-    const failure = errors ? ` · ${errors} 项失败` : "";
-    const current = pending.length
-      ? ` · ${toolDescription(pending.at(-1)!).action}`
+    const count = records.length ? `${records.length} 项操作` : "";
+    const failure = errors ? `${errors} 项失败` : "";
+    const latest =
+      pending.length && !interrupted
+        ? toolDescription(pending.at(-1)!)
+        : undefined;
+    const current = latest
+      ? `${latest.action}${latest.target ? ` · ${latest.target}` : ""}`
       : "";
-    const summary = `${label}${count}${failure}${current}`;
-    if (cached.summary.textContent !== summary)
-      cached.summary.textContent = summary;
+    const summary = [label, count, failure, current]
+      .filter(Boolean)
+      .join(" · ");
+    if (cached.summary.getAttribute("aria-label") !== summary)
+      cached.summary.setAttribute("aria-label", summary);
+    for (const [node, text] of [
+      [cached.label, label],
+      [cached.count, count],
+      [cached.failure, failure],
+      [cached.current, current],
+    ] as const) {
+      if (node.textContent !== text) node.textContent = text;
+      if (node.hidden !== !text) node.hidden = !text;
+    }
     const className = `execution${errors || interrupted ? " has-error" : ""}${pending.length && !interrupted ? " is-running" : ""}`;
     if (cached.node.className !== className) cached.node.className = className;
     reconcileChildren(cached.body, activity.children);

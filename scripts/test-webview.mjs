@@ -821,6 +821,7 @@ try {
               "panel-border": colors.border,
               focusBorder: colors.focus,
               "textLink-foreground": colors.accent,
+              errorForeground: theme === "light" ? "#b42318" : "#f48771",
               contrastBorder: colors.border,
               "font-size": "13px",
               "input-background": colors.bg,
@@ -906,7 +907,7 @@ try {
         const executionSummary = execution.locator(":scope > summary");
         assert.equal(await execution.count(), 1);
         assert.match(
-          await executionSummary.textContent(),
+          await executionSummary.getAttribute("aria-label"),
           /7 项操作 · 1 项失败/,
         );
         assert.equal(await execution.evaluate((node) => node.open), false);
@@ -928,6 +929,21 @@ try {
         await executionSummary.focus();
         await page.keyboard.press("Enter");
         assert.equal(await execution.evaluate((node) => node.open), true);
+        await execution
+          .locator(".execution-body")
+          .evaluate((node) =>
+            Promise.all(
+              node.getAnimations().map((animation) => animation.finished),
+            ),
+          );
+        await executionSummary.scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: join(
+            artifacts,
+            `process-overview-${theme}-${width}-${zoom}.png`,
+          ),
+          fullPage: true,
+        });
         const commandSummary = page
           .locator(".tool")
           .nth(1)
@@ -989,6 +1005,7 @@ try {
             state: {
               ...window.processFixture,
               run: "running",
+              messages: window.processFixture.messages.slice(0, -1),
               tools: window.processFixture.tools.map((tool, index) =>
                 index === 6
                   ? { ...tool, status: "pending", result: undefined }
@@ -1009,6 +1026,52 @@ try {
         await executionSummary.focus();
         await page.keyboard.press("Enter");
         assert.equal(await execution.evaluate((node) => node.open), false);
+        assert.equal(
+          await execution.locator(".execution-failure").isVisible(),
+          false,
+        );
+        const icon = execution.locator(".execution-icon");
+        assert.equal(
+          await icon.evaluate(
+            (node) => getComputedStyle(node, "::before").animationName,
+          ),
+          "execution-orbit",
+        );
+        assert.equal(
+          await executionSummary.evaluate(
+            (node) => getComputedStyle(node, "::after").animationName,
+          ),
+          "execution-sheen",
+        );
+        await page.screenshot({
+          path: join(
+            artifacts,
+            `process-running-${theme}-${width}-${zoom}.png`,
+          ),
+          fullPage: true,
+        });
+        await page.emulateMedia({ reducedMotion: "reduce" });
+        assert.equal(
+          await icon.evaluate(
+            (node) => getComputedStyle(node, "::before").animationName,
+          ),
+          "none",
+        );
+        assert.equal(
+          await executionSummary.evaluate(
+            (node) => getComputedStyle(node, "::after").display,
+          ),
+          "none",
+        );
+        await executionSummary.focus();
+        await page.keyboard.press("Enter");
+        assert.equal(
+          await execution
+            .locator(".execution-body")
+            .evaluate((node) => getComputedStyle(node).animationName),
+          "none",
+        );
+        await page.emulateMedia({ reducedMotion: "no-preference" });
         await page.evaluate(() =>
           window.deliver({ type: "snapshot", state: window.fixtureState }),
         );

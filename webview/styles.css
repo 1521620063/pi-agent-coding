@@ -499,35 +499,187 @@ main {
 .tool > summary::-webkit-details-marker {
   display: none;
 }
-.execution > summary::before,
 .tool > summary::before {
   content: "›";
   flex: 0 0 10px;
   text-align: center;
   font-family: var(--vscode-font-family, system-ui);
   color: var(--pi-muted);
+  transition: transform 180ms ease;
 }
-.execution[open] > summary::before,
 .tool[open] > summary::before {
   transform: rotate(90deg);
 }
 .execution > summary {
-  padding: 6px 0;
-  border-radius: 3px;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 10px;
+  gap: 9px;
+  overflow: hidden;
+  padding: 10px 11px;
+  border: 1px solid color-mix(in srgb, var(--pi-accent) 23%, var(--pi-bg));
+  border-radius: 10px;
+  background: linear-gradient(
+    110deg,
+    color-mix(in srgb, var(--pi-accent) 8%, var(--pi-bg)),
+    color-mix(in srgb, var(--pi-accent) 3%, var(--pi-bg))
+  );
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
-.execution > summary:hover {
-  color: var(--pi-fg);
+.execution > summary:hover,
+.execution[open] > summary {
+  border-color: color-mix(in srgb, var(--pi-accent) 45%, var(--pi-bg));
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--pi-accent) 5%, transparent);
 }
-.execution.is-running > summary {
-  color: var(--pi-fg);
+.execution-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--pi-accent);
+  background: color-mix(in srgb, var(--pi-accent) 11%, transparent);
 }
-.execution.has-error > summary {
-  color: var(--pi-tool-error);
+.execution-icon::after {
+  content: "✦";
+  font: 16px/1 var(--vscode-font-family, system-ui);
+}
+.execution-icon::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 1px solid transparent;
+  border-radius: 50%;
+}
+.execution-heading {
+  min-width: 0;
+}
+.execution-labels {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 7px;
+}
+.execution-label {
+  color: var(--pi-accent);
+  font-weight: 500;
+}
+.execution-count,
+.execution-failure {
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--pi-accent) 16%, transparent);
+  border-radius: 4px;
+  font-size: var(--pi-font-compact);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.execution-count {
+  color: var(--pi-muted);
+  background: color-mix(in srgb, var(--pi-accent) 4%, transparent);
+}
+.execution-failure {
+  color: var(--pi-tool-error, var(--pi-accent));
+  border-color: color-mix(in srgb, currentColor 25%, transparent);
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+.execution-current {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--pi-font-compact);
+  color: var(--pi-muted);
+}
+.execution-chevron {
+  width: 6px;
+  height: 6px;
+  border-right: 1px solid var(--pi-accent);
+  border-bottom: 1px solid var(--pi-accent);
+  transform: rotate(-45deg);
+  transition: transform 180ms ease;
+}
+.execution[open] .execution-chevron {
+  transform: rotate(45deg);
+}
+.execution.is-running .execution-icon::before {
+  border-color: color-mix(in srgb, var(--pi-accent) 22%, transparent);
+  border-top-color: var(--pi-accent);
+  animation: execution-orbit 1.8s linear infinite;
+}
+.execution.is-running > summary::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--pi-accent) 9%, transparent),
+    transparent
+  );
+  animation: execution-sheen 4s ease-in-out infinite;
 }
 .execution-body {
-  margin: 5px 0 0 5px;
-  padding-left: 12px;
-  border-left: 1px solid var(--pi-line);
+  margin: 12px 0 0 11px;
+  padding-left: 14px;
+  border-left: 1px solid
+    color-mix(in srgb, var(--pi-accent) 25%, var(--pi-line));
+}
+.execution[open] > .execution-body {
+  animation: execution-reveal 200ms ease-out;
+}
+@keyframes execution-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes execution-sheen {
+  0%,
+  15% {
+    transform: translateX(-110%);
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  75%,
+  100% {
+    transform: translateX(350%);
+    opacity: 0;
+  }
+}
+@keyframes execution-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .execution *,
+  .execution *::before,
+  .execution *::after,
+  .tool > summary::before {
+    animation: none !important;
+    transition: none !important;
+  }
+  .execution.is-running > summary::after {
+    display: none;
+  }
+}
+.vscode-high-contrast .execution > summary,
+.vscode-high-contrast-light .execution > summary {
+  border-color: var(--pi-line);
+  box-shadow: none;
 }
 .execution-body > .assistant-message {
   margin: 0 0 8px;
@@ -548,10 +700,19 @@ main {
   background: transparent;
 }
 .tool > summary {
-  padding: 5px 0;
+  padding: 5px 3px;
+  border-radius: 5px;
   line-height: 1.5;
   font-size: var(--pi-font-small);
   font-family: inherit;
+  transition: background-color 160ms ease;
+}
+.tool > summary:hover {
+  background: var(--pi-hover);
+}
+.tool.success .tool-status,
+.tool.pending .tool-status {
+  color: var(--pi-accent);
 }
 .tool-action {
   flex: 0 1 auto;

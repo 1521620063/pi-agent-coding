@@ -55,7 +55,7 @@ it("collapses commentary, thinking and multiple tool calls into one process whil
   expect(container.children).toHaveLength(3);
   const execution = container.querySelector<HTMLDetailsElement>(".execution")!;
   expect(execution.open).toBe(false);
-  expect(execution.querySelector("summary")?.textContent).toBe(
+  expect(execution.querySelector("summary")?.getAttribute("aria-label")).toBe(
     "执行过程 · 2 项操作",
   );
   expect(execution.querySelectorAll(".tool")).toHaveLength(2);
@@ -91,9 +91,15 @@ it("keeps expanded groups, tools and their focus stable as more operations arriv
   expect(execution.open).toBe(true);
   expect(read.open).toBe(true);
   expect(document.activeElement).toBe(button);
-  expect(execution.querySelector("summary")?.textContent).toContain(
-    "正在执行 · 3 项操作",
+  expect(
+    execution.querySelector("summary")?.getAttribute("aria-label"),
+  ).toContain("正在执行 · 3 项操作");
+  expect(execution.querySelector(".execution-current")?.textContent).toBe(
+    "custom_mcp",
   );
+  expect(
+    execution.querySelector<HTMLElement>(".execution-failure")?.hidden,
+  ).toBe(true);
   expect(container.lastElementChild?.textContent).toContain("最终结论");
 });
 
