@@ -535,25 +535,15 @@ main {
   box-shadow: 0 2px 12px color-mix(in srgb, var(--pi-accent) 5%, transparent);
 }
 .execution-icon {
-  position: relative;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   width: 22px;
   height: 22px;
-  border-radius: 50%;
+  border-radius: 6px;
   color: var(--pi-accent);
-  background: color-mix(in srgb, var(--pi-accent) 11%, transparent);
-}
-.execution-icon::after {
-  content: "✦";
-  font: 16px/1 var(--vscode-font-family, system-ui);
-}
-.execution-icon::before {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border: 1px solid transparent;
-  border-radius: 50%;
+  background: color-mix(in srgb, var(--pi-accent) 9%, transparent);
 }
 .execution-heading {
   min-width: 0;
@@ -582,9 +572,9 @@ main {
   background: color-mix(in srgb, var(--pi-accent) 4%, transparent);
 }
 .execution-failure {
-  color: var(--pi-tool-error, var(--pi-accent));
-  border-color: color-mix(in srgb, currentColor 25%, transparent);
-  background: color-mix(in srgb, currentColor 6%, transparent);
+  color: var(--pi-muted);
+  border-color: var(--pi-line);
+  background: var(--pi-soft);
 }
 .execution-current {
   display: block;
@@ -636,11 +626,6 @@ main {
 .execution[open] .execution-chevron {
   transform: rotate(45deg);
 }
-.execution.is-running .execution-icon::before {
-  border-color: color-mix(in srgb, var(--pi-accent) 22%, transparent);
-  border-top-color: var(--pi-accent);
-  animation: execution-orbit 1.8s linear infinite;
-}
 .execution.is-running > summary::after {
   content: "";
   position: absolute;
@@ -663,11 +648,6 @@ main {
 }
 .execution[open] > .execution-body {
   animation: execution-reveal 200ms ease-out;
-}
-@keyframes execution-orbit {
-  to {
-    transform: rotate(360deg);
-  }
 }
 @keyframes execution-sheen {
   0%,
@@ -955,42 +935,37 @@ input[type="checkbox"] {
   line-height: 1.5;
 }
 .working-spinner {
-  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   flex: 0 0 14px;
   width: 14px;
   height: 14px;
   color: var(--pi-accent);
 }
-.working-spinner::before,
-.working-spinner::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.working-spinner::before {
+.activity-bar {
+  flex: 0 0 2px;
+  width: 2px;
+  height: 12px;
+  border-radius: 2px;
   background: currentColor;
-  clip-path: polygon(
-    50% 0,
-    62% 36%,
-    100% 50%,
-    62% 64%,
-    50% 100%,
-    38% 64%,
-    0 50%,
-    38% 36%
-  );
-  animation: working-spark 2.8s ease-in-out infinite;
+  opacity: 0.85;
 }
-.working-spinner::after {
-  inset: -5px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--pi-accent) 18%, transparent),
-    transparent 70%
-  );
-  animation: working-glow 2.8s ease-in-out infinite;
+.working-spinner .activity-bar,
+.execution.is-running .activity-bar {
+  animation: activity-flow 1.4s ease-in-out var(--activity-delay) infinite;
+}
+.activity-bar:nth-child(1) {
+  height: 7px;
+  --activity-delay: -0.9s;
+}
+.activity-bar:nth-child(2) {
+  --activity-delay: -0.7s;
+}
+.activity-bar:nth-child(3) {
+  height: 9px;
+  --activity-delay: -0.5s;
 }
 .working-label {
   color: var(--pi-accent);
@@ -1010,29 +985,15 @@ input[type="checkbox"] {
   -webkit-text-fill-color: transparent;
   animation: working-shimmer 3.6s ease-in-out infinite;
 }
-@keyframes working-spark {
-  0% {
-    transform: rotate(0deg) scale(0.8);
-    opacity: 0.65;
-  }
-  50% {
-    transform: rotate(90deg) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: rotate(180deg) scale(0.8);
-    opacity: 0.65;
-  }
-}
-@keyframes working-glow {
+@keyframes activity-flow {
   0%,
   100% {
-    transform: scale(0.8);
-    opacity: 0.35;
+    transform: scaleY(0.45);
+    opacity: 0.5;
   }
   50% {
-    transform: scale(1.15);
-    opacity: 0.8;
+    transform: scaleY(1);
+    opacity: 1;
   }
 }
 @keyframes working-shimmer {
@@ -1052,10 +1013,6 @@ input[type="checkbox"] {
   -webkit-text-fill-color: currentColor;
   animation: none;
 }
-.vscode-high-contrast .working-spinner::after,
-.vscode-high-contrast-light .working-spinner::after {
-  display: none;
-}
 @media (forced-colors: active) {
   .working-label {
     background: none;
@@ -1063,17 +1020,13 @@ input[type="checkbox"] {
     -webkit-text-fill-color: currentColor;
     animation: none;
   }
-  .working-spinner::before {
-    background: Highlight;
+  .activity-bar {
+    background: CanvasText;
     forced-color-adjust: none;
-  }
-  .working-spinner::after {
-    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .working-spinner::before,
-  .working-spinner::after,
+  .working-spinner .activity-bar,
   .working-label {
     animation: none;
   }

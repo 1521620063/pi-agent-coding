@@ -722,12 +722,13 @@ try {
   const workingNode = await working.elementHandle();
   const spinnerFrame = () =>
     page
-      .locator(".working-spinner")
-      .evaluate((node) => getComputedStyle(node, "::before").transform);
+      .locator(".working-spinner .activity-bar")
+      .first()
+      .evaluate((node) => getComputedStyle(node).transform);
   const firstFrame = await spinnerFrame();
   await page.waitForFunction(
     (first) =>
-      getComputedStyle(document.querySelector(".working-spinner"), "::before")
+      getComputedStyle(document.querySelector(".working-spinner .activity-bar"))
         .transform !== first,
     firstFrame,
   );
@@ -746,17 +747,16 @@ try {
       .evaluate((node) => getComputedStyle(node).animationName),
     "working-shimmer",
   );
+  assert.equal(await working.locator(".activity-bar").count(), 3);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  for (const pseudo of ["::before", "::after"])
-    assert.equal(
-      await working
-        .locator(".working-spinner")
-        .evaluate(
-          (node, pseudo) => getComputedStyle(node, pseudo).animationName,
-          pseudo,
-        ),
-      "none",
-    );
+  assert.deepEqual(
+    await working
+      .locator(".activity-bar")
+      .evaluateAll((nodes) =>
+        nodes.map((node) => getComputedStyle(node).animationName),
+      ),
+    ["none", "none", "none"],
+  );
   assert.equal(
     await working
       .locator(".working-label")
@@ -965,7 +965,18 @@ try {
         assert.equal(await execution.count(), 1);
         assert.match(
           await executionSummary.getAttribute("aria-label"),
-          /7 项操作 · 1 项失败/,
+          /7 项操作 · 1 项异常/,
+        );
+        assert.equal(
+          await execution
+            .locator(".execution-failure")
+            .evaluate(
+              (node) =>
+                getComputedStyle(node).color ===
+                getComputedStyle(document.querySelector(".execution-count"))
+                  .color,
+            ),
+          true,
         );
         assert.equal(await execution.evaluate((node) => node.open), false);
         assert.equal(await page.locator(".tool").first().isVisible(), false);
@@ -1071,7 +1082,7 @@ try {
             },
           });
         });
-        assert.match(await executionSummary.textContent(), /正在执行/);
+        assert.match(await executionSummary.textContent(), /Running/);
         assert.equal(await execution.evaluate((node) => node.open), true);
         assert.equal(
           await page
@@ -1088,11 +1099,13 @@ try {
           false,
         );
         const icon = execution.locator(".execution-icon");
+        assert.equal(await icon.locator(".activity-bar").count(), 3);
         assert.equal(
-          await icon.evaluate(
-            (node) => getComputedStyle(node, "::before").animationName,
-          ),
-          "execution-orbit",
+          await icon
+            .locator(".activity-bar")
+            .first()
+            .evaluate((node) => getComputedStyle(node).animationName),
+          "activity-flow",
         );
         assert.equal(
           await executionSummary.evaluate(
@@ -1109,9 +1122,10 @@ try {
         });
         await page.emulateMedia({ reducedMotion: "reduce" });
         assert.equal(
-          await icon.evaluate(
-            (node) => getComputedStyle(node, "::before").animationName,
-          ),
+          await icon
+            .locator(".activity-bar")
+            .first()
+            .evaluate((node) => getComputedStyle(node).animationName),
           "none",
         );
         assert.equal(
@@ -1155,7 +1169,7 @@ try {
         const liveExecution = page.locator(".execution");
         const liveSummary = liveExecution.locator(":scope > summary");
         const livePreview = liveExecution.locator(".execution-preview");
-        assert.match(await liveSummary.textContent(), /等待响应/);
+        assert.match(await liveSummary.textContent(), /Waiting/);
         if (theme === "dark" && width === 320 && zoom === 1) {
           const elapsed = await liveExecution
             .locator(".execution-elapsed")
@@ -1186,7 +1200,7 @@ try {
           });
           window.publishActivity();
         });
-        assert.match(await liveSummary.textContent(), /思考中/);
+        assert.match(await liveSummary.textContent(), /Thinking/);
         assert.equal(await livePreview.isVisible(), true);
         assert.equal(await livePreview.locator("script").count(), 0);
         assert.ok((await livePreview.textContent()).length <= 600);
@@ -1234,7 +1248,7 @@ try {
           window.publishActivity();
         });
         assert.equal(await livePreview.isVisible(), false);
-        assert.match(await liveSummary.textContent(), /正在生成回复/);
+        assert.match(await liveSummary.textContent(), /Writing/);
         assert.equal(
           await page
             .locator("#transcript > .assistant-message .markdown")
@@ -1279,7 +1293,7 @@ try {
           });
           window.publishActivity();
         });
-        assert.match(await liveSummary.textContent(), /正在执行/);
+        assert.match(await liveSummary.textContent(), /Running/);
         assert.equal(await livePreview.isVisible(), true);
         assert.match(await livePreview.textContent(), /最新检查进度/);
         await liveSummary.scrollIntoViewIfNeeded();
@@ -1314,7 +1328,7 @@ try {
           });
           window.publishActivity();
         });
-        assert.match(await liveSummary.textContent(), /思考中/);
+        assert.match(await liveSummary.textContent(), /Thinking/);
         assert.equal(
           await livePreview.isVisible(),
           false,
@@ -1401,7 +1415,7 @@ try {
         );
         assert.match(
           await nextExecution.locator(".execution-label").textContent(),
-          /执行过程/,
+          /Activity/,
         );
         await page.evaluate(() =>
           window.deliver({ type: "snapshot", state: window.fixtureState }),
@@ -1414,11 +1428,9 @@ try {
           ),
           theme === "contrast" ? "none" : "working-shimmer",
         );
-        await page
-          .locator("#activity")
-          .screenshot({
-            path: join(artifacts, `working-${theme}-${width}-${zoom}.png`),
-          });
+        await page.locator("#activity").screenshot({
+          path: join(artifacts, `working-${theme}-${width}-${zoom}.png`),
+        });
         await page.screenshot({
           path: join(artifacts, `${theme}-${width}-${zoom}.png`),
           fullPage: true,

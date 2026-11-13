@@ -370,6 +370,8 @@ function renderState() {
       working.setAttribute("aria-label", "PI 正在工作");
       const spinner = element("span", "working-spinner");
       spinner.setAttribute("aria-hidden", "true");
+      for (let index = 0; index < 3; index++)
+        spinner.append(element("span", "activity-bar"));
       working.append(spinner, element("span", "working-label", "Working"));
       activity.append(working);
     }

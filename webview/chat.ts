@@ -214,12 +214,15 @@ export function renderChat(
         summary.title = "展开或收起完整执行过程；运行预览最多显示三行";
         const icon = element("span", "execution-icon");
         icon.setAttribute("aria-hidden", "true");
+        for (let index = 0; index < 3; index++)
+          icon.append(element("span", "activity-bar"));
         const heading = element("span", "execution-heading");
         const labels = element("span", "execution-labels");
         const label = element("span", "execution-label");
         label.setAttribute("role", "status");
         const count = element("span", "execution-count");
         const failure = element("span", "execution-failure");
+        failure.title = "工具返回异常，展开查看详情";
         const elapsed = element("span", "execution-elapsed");
         const current = element("span", "execution-current");
         const preview = element("span", "execution-preview");
@@ -360,26 +363,26 @@ export function renderChat(
     const retrying = active && !!state.retry.active;
     const compacting = active && !!state.compaction.active;
     const label = interrupted
-      ? "执行已中断"
+      ? "Interrupted"
       : waitingUi
-        ? "等待你的操作"
+        ? "Input needed"
         : retrying
-          ? "正在重试"
+          ? "Retrying"
           : compacting
-            ? "正在压缩上下文"
+            ? "Compacting"
             : pending.length
-              ? "正在执行"
+              ? "Running"
               : generation?.kind === "thinking"
-                ? "思考中"
+                ? "Thinking"
                 : generation?.kind === "text"
-                  ? "正在生成回复"
+                  ? "Writing"
                   : generation?.kind === "toolCall"
-                    ? "正在准备工具"
+                    ? "Preparing"
                     : active
-                      ? "等待响应"
-                      : "执行过程";
+                      ? "Waiting"
+                      : "Activity";
     const count = records.length ? `${records.length} 项操作` : "";
-    const failure = errors ? `${errors} 项失败` : "";
+    const failure = errors ? `${errors} 项异常` : "";
     const latest =
       pending.length && !interrupted && !waitingUi && !retrying && !compacting
         ? toolDescription(pending.at(-1)!)

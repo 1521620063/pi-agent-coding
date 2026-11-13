@@ -39,7 +39,7 @@ it("shows waiting immediately, previews actual thinking, and withdraws it at thi
   expect(execution).not.toBeNull();
   expect(execution.open).toBe(false);
   expect(execution.querySelector(".execution-label")?.textContent).toBe(
-    "等待响应",
+    "Waiting",
   );
   thinking(store, "检查 <script> 原始文本");
   render();
@@ -49,7 +49,7 @@ it("shows waiting immediately, previews actual thinking, and withdraws it at thi
   expect(preview.textContent).toContain("检查 <script> 原始文本");
   expect(preview.querySelector("script")).toBeNull();
   expect(execution.querySelector(".execution-label")?.textContent).toBe(
-    "思考中",
+    "Thinking",
   );
   store.apply({
     type: "message_update",
@@ -71,7 +71,7 @@ it("shows waiting immediately, previews actual thinking, and withdraws it at thi
   });
   render();
   expect(execution.querySelector(".execution-label")?.textContent).toBe(
-    "正在生成回复",
+    "Writing",
   );
   expect(
     container.querySelector(":scope > .assistant-message")?.textContent,
@@ -154,7 +154,7 @@ it("switches to bounded tool output, folds on settlement, and retains full histo
   expect(execution.open).toBe(false);
   expect(execution.classList.contains("is-running")).toBe(false);
   expect(execution.querySelector(".execution-label")?.textContent).toBe(
-    "执行过程",
+    "Activity",
   );
   expect(execution.querySelector(".tool-output")?.textContent).toBe("检查通过");
 });
@@ -187,10 +187,10 @@ it("keeps interaction, retry, compaction and disconnection visible without old t
   const { store, container, render } = fixture();
   thinking(store);
   for (const [patch, label] of [
-    [{ pendingUi: [{ id: "confirm" }] }, "等待你的操作"],
-    [{ pendingUi: [], retry: { active: true, attempt: 2 } }, "正在重试"],
-    [{ retry: {}, compaction: { active: true } }, "正在压缩上下文"],
-    [{ compaction: {}, connection: "disconnected" }, "执行已中断"],
+    [{ pendingUi: [{ id: "confirm" }] }, "Input needed"],
+    [{ pendingUi: [], retry: { active: true, attempt: 2 } }, "Retrying"],
+    [{ retry: {}, compaction: { active: true } }, "Compacting"],
+    [{ compaction: {}, connection: "disconnected" }, "Interrupted"],
   ] as const) {
     store.update(
       structuredClone(patch) as Parameters<SessionStore["update"]>[0],
@@ -214,7 +214,7 @@ it("keeps a disconnect visible after the controller also resets run to idle", ()
   render();
   render();
   expect(container.querySelector(".execution-label")?.textContent).toBe(
-    "执行已中断",
+    "Interrupted",
   );
   expect(container.querySelector(".execution.is-running")).toBeNull();
   expect(
@@ -237,7 +237,7 @@ it("stops preview and animation at settlement even if a tool has no end event", 
   render();
   expect(container.querySelector(".execution.is-running")).toBeNull();
   expect(container.querySelector(".execution-label")?.textContent).toBe(
-    "执行已中断",
+    "Interrupted",
   );
   expect(
     container.querySelector<HTMLElement>(".execution-preview")?.hidden,

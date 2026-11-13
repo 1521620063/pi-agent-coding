@@ -56,7 +56,7 @@ it("collapses commentary, thinking and multiple tool calls into one process whil
   const execution = container.querySelector<HTMLDetailsElement>(".execution")!;
   expect(execution.open).toBe(false);
   expect(execution.querySelector("summary")?.getAttribute("aria-label")).toBe(
-    "执行过程 · 2 项操作",
+    "Activity · 2 项操作",
   );
   expect(execution.querySelectorAll(".tool")).toHaveLength(2);
   expect(execution.textContent).toContain("先阅读文件");
@@ -94,7 +94,7 @@ it("keeps expanded groups, tools and their focus stable as more operations arriv
   expect(document.activeElement).toBe(button);
   expect(
     execution.querySelector("summary")?.getAttribute("aria-label"),
-  ).toContain("正在执行 · 3 项操作");
+  ).toContain("Running · 3 项操作");
   expect(execution.querySelector(".execution-current")?.textContent).toBe(
     "custom_mcp",
   );
@@ -112,7 +112,7 @@ it("shows failure counts in collapsed groups and retains full arguments and outp
   const execution = container.querySelector<HTMLDetailsElement>(".execution")!;
   expect(execution.open).toBe(false);
   expect(execution.classList.contains("has-error")).toBe(true);
-  expect(execution.querySelector("summary")?.textContent).toContain("1 项失败");
+  expect(execution.querySelector("summary")?.textContent).toContain("1 项异常");
   expect(execution.querySelector(".tool.error .tool-action")?.textContent).toBe(
     "运行命令",
   );
@@ -221,5 +221,5 @@ it("groups thinking-only updates without hiding normal answers and marks interru
   renderChat(container, structuredClone(state));
   expect(
     container.querySelector(".execution > summary")?.textContent,
-  ).toContain("执行已中断");
+  ).toContain("Interrupted");
 });
