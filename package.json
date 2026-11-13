@@ -2,7 +2,7 @@
   "name": "pi-agent-coding",
   "displayName": "PI Agent Coding",
   "description": "A native-feeling VS Code sidebar for your locally installed PI coding agent.",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "publisher": "SilasPaul",
   "preview": false,
   "license": "MIT",
