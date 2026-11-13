@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -48,7 +48,7 @@ it("uses a workspace containing spaces and Chinese, and stops clear_queue before
   await pi.connect(uri);
   const pid = pi.pid!;
   const state = await pi.request<{ cwd: string }>({ type: "get_state" });
-  expect(state.cwd).toBe(workspace);
+  expect(await realpath(state.cwd)).toBe(await realpath(workspace));
   expect(store.getSnapshot().session?.id).toBe("lifecycle-fixture");
   await pi.stopAll();
   const result = await pi.request<{ order: string[] }>({ type: "order" });
@@ -93,15 +93,12 @@ it("rejects unbounded requests and cleans its process on protocol corruption", a
   expect(() => process.kill(pid, 0)).toThrow();
 });
 
-it.skipIf(process.platform !== "win32")(
-  "terminates its stubborn Windows child and descendant",
-  async () => {
-    const { pi, uri } = await fixture("stubborn");
-    await pi.connect(uri);
-    const pid = pi.pid!;
-    const state = await pi.request<{ childPid: number }>({ type: "get_state" });
-    await pi.disconnect();
-    expect(() => process.kill(pid, 0)).toThrow();
-    expect(() => process.kill(state.childPid, 0)).toThrow();
-  },
-);
+it("terminates its stubborn child and descendant", async () => {
+  const { pi, uri } = await fixture("stubborn");
+  await pi.connect(uri);
+  const pid = pi.pid!;
+  const state = await pi.request<{ childPid: number }>({ type: "get_state" });
+  await pi.disconnect();
+  expect(() => process.kill(pid, 0)).toThrow();
+  expect(() => process.kill(state.childPid, 0)).toThrow();
+});

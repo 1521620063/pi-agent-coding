@@ -1,5 +1,12 @@
 # 更新记录
 
+## 未发布
+
+- 补充 Windows / macOS 常见安装目录与 Node.js 自动发现，处理 VS Code 缺少 shell PATH 的情况。
+- 识别 macOS 官方托管安装与 npm 符号链接，每次连接重新解析当前 PI 版本；明确区分启动器、Node 与文件权限错误。
+- macOS 强制关闭使用独占进程组，补齐子进程清理；修复明确选择的文件经过真实路径解析后无法打开的问题。
+- 修正测试中的 Windows 路径假设，增加双平台 CI 与 macOS 本机 VS Code 检测。验证范围见 README。
+
 ## 1.0.4
 
 - 同一轮任务中的进度说明、思考和工具调用收进可展开的执行过程入口 `Activity`，最终回复单独显示；阶段标题统一为 `Waiting`、`Thinking`、`Writing`、`Preparing`、`Running`、`Input needed`、`Retrying`、`Compacting`、`Interrupted`。

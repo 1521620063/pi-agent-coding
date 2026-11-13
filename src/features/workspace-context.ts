@@ -298,10 +298,14 @@ export class WorkspaceContextService {
     const allowed = (path: string) =>
       this.explicit.get(pathKey(path)) === pathKey(root) ||
       attachedPaths.has(pathKey(path));
-    if (!isInside(root, candidate) && !allowed(candidate))
+    const [actual, actualRoot] = await Promise.all([
+      realpath(candidate),
+      realpath(root),
+    ]);
+    // macOS /var and /private/var may name the same selected file. A grant
+    // still applies only to that canonical file, never its containing directory.
+    if (!isInside(root, candidate) && !allowed(candidate) && !allowed(actual))
       throw new Error("文件不属于当前工作区。");
-    const actual = await realpath(candidate);
-    const actualRoot = await realpath(root);
     if (!isInside(actualRoot, actual) && !allowed(actual))
       throw new Error("文件不属于当前工作区。");
     if (!(await stat(actual)).isFile()) throw new Error("请选择文件。");

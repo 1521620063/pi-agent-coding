@@ -79,6 +79,7 @@ export class PiController {
           env: launch.env,
           cwd,
           windowsHide: true,
+          detached: process.platform !== "win32",
           stdio: ["pipe", "pipe", "pipe"],
         });
         this.versionChild = child;
@@ -90,7 +91,12 @@ export class PiController {
         child.stdout.on("data", (chunk) => {
           output += chunk.toString();
         });
-        child.stderr.on("data", (chunk) => this.log(chunk.toString()));
+        child.stderr.on("data", (chunk) => {
+          this.diagnostics = (this.diagnostics + chunk.toString()).slice(
+            -16000,
+          );
+          this.log(chunk.toString());
+        });
         child.on("error", (error) => {
           clearTimeout(timer);
           reject(error);
@@ -109,6 +115,7 @@ export class PiController {
         env: launch.env,
         cwd,
         windowsHide: true,
+        detached: process.platform !== "win32",
         stdio: ["pipe", "pipe", "pipe"],
       });
       this.child = child;
@@ -278,5 +285,12 @@ async function killTree(child: {
       killer.on("error", () => resolve());
       killer.on("exit", () => resolve());
     });
-  else child.kill("SIGKILL");
+  else {
+    try {
+      // Each PI process owns a separate POSIX group; never signal the editor's group.
+      process.kill(-child.pid, "SIGKILL");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+    }
+  }
 }

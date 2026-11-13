@@ -4,9 +4,9 @@
 
 插件通过 `pi --mode rpc` 桥接本机 PI：界面与编辑器上下文由插件提供，推理、模型、工具、技能和会话仍由 PI 管理。交互组织参考 Codex / Claude Code 的侧栏方式，视觉优先参考 PI 自身的文本布局、消息配色和紧凑状态栏，并适配 VS Code 主题。
 
-当前版本为 **1.0.4（正式版）**，扩展标识为 `SilasPaul.pi-agent-coding`。验证基线为 **Windows + PI 1.5.2**；首次上架完成前可通过 VSIX 安装。具体变更见 [更新记录](CHANGELOG.md)。
+当前版本为 **1.0.4（正式版）**，扩展标识为 `SilasPaul.pi-agent-coding`。PI 协议验证基线为 **1.5.2**，兼容目标为 **Windows 与 macOS 本地环境**；首次上架完成前可通过 VSIX 安装。具体变更见 [更新记录](CHANGELOG.md)。
 
-验收范围：当前仅验证 Windows 本地环境；真实模型生成、真实 MCP / 扩展交互和长会话成功压缩尚未完成端到端验收。模拟进程、浏览器夹具和扩展宿主测试不代表这些真实环境已经通过。完整说明见“范围与限制”。
+验收范围：Windows 保留既有本地验证基线；本轮在 macOS 验证了自动发现、真实 PI RPC 握手、模拟进程清理和原生 VS Code 扩展宿主，新增 Windows / macOS CI 尚待远端运行；真实模型生成、真实 MCP / 扩展交互和长会话成功压缩尚未完成端到端验收。模拟进程、浏览器夹具和扩展宿主测试不代表这些真实环境已经通过。完整说明见“范围与限制”。
 
 ## 界面
 
@@ -51,20 +51,20 @@ PI 运行时显示暖金色心电图折线，高亮沿波形从左向右循环�
 
 在聊天输入框输入 `/`，可选择 PI 发现的技能、提示模板、扩展命令，以及以下插件快捷操作。方向键选择，`Tab` / `Enter` 补全，再按 `Enter` 执行。
 
-| 快捷命令 | 操作 |
-| --- | --- |
-| `/new` | 新建会话；当前正在运行时先停止全部任务 |
+| 快捷命令              | 操作                                                                 |
+| --------------------- | -------------------------------------------------------------------- |
+| `/new`                | 新建会话；当前正在运行时先停止全部任务                               |
 | `/compact [摘要要求]` | 手动压缩上下文，例如 `/compact 保留文件名和待办`；需等待当前任务完成 |
-| `/model` | 从 PI 返回的可用模型中选择 |
-| `/thinking` | 从 PI 返回的可用思考强度中选择 |
-| `/resume` | 打开当前工作区的会话历史；也可从历史面板选择会话文件 |
-| `/name [名称]` | 重命名当前会话；省略名称时弹出输入框 |
-| `/fork` | 选择用户消息并分叉，不回滚文件 |
-| `/clone` | 复制当前会话，不回滚文件 |
-| `/tree` | 只读浏览会话历史树 |
-| `/export` | 导出对话为 HTML |
-| `/settings` | 打开侧栏内的设置面板 |
-| `/stop` | 清空队列并停止当前任务 |
+| `/model`              | 从 PI 返回的可用模型中选择                                           |
+| `/thinking`           | 从 PI 返回的可用思考强度中选择                                       |
+| `/resume`             | 打开当前工作区的会话历史；也可从历史面板选择会话文件                 |
+| `/name [名称]`        | 重命名当前会话；省略名称时弹出输入框                                 |
+| `/fork`               | 选择用户消息并分叉，不回滚文件                                       |
+| `/clone`              | 复制当前会话，不回滚文件                                             |
+| `/tree`               | 只读浏览会话历史树                                                   |
+| `/export`             | 导出对话为 HTML                                                      |
+| `/settings`           | 打开侧栏内的设置面板                                                 |
+| `/stop`               | 清空队列并停止当前任务                                               |
 
 这些快捷操作复用插件已有的服务与 PI RPC，不作为普通消息交给模型。除 `/compact` 和 `/name` 外不接收参数；除 `/stop` 保留已有附件并直接停止外，其他快捷操作不接收附件。失败或取消对话框时保留命令草稿。PI 已发现的同名命令优先，保持现有技能、模板与扩展的行为；其余插件快捷操作在补全列表中优先显示。
 
@@ -79,13 +79,13 @@ PI 运行时显示暖金色心电图折线，高亮沿波形从左向右循环�
 - 打开一个本地文件夹，并在 VS Code 中信任该工作区。
 - 使用 JS 入口或脚本启动器时，本机需有能运行该 PI 版本的 Node.js；可通过 `pi.nodePath` 指定。
 
-当前仅验证 Windows 本地扩展宿主。远程、虚拟和未受信任工作区不启动 PI；macOS / Linux 尚未实测。
+Windows 与 macOS 使用相同的 RPC 桥接；macOS 已验证本地扩展宿主与 PI 1.5.2 的连接。远程、虚拟和未受信任工作区不启动 PI；Linux 尚未实测。
 
 ### 2. 安装扩展
 
 上架后，可在扩展视图中搜索 `@id:SilasPaul.pi-agent-coding`，核对发布者为 **SilasPaul** 后安装；也可通过命令 `code --install-extension SilasPaul.pi-agent-coding` 安装。首次上架前请使用下面的 VSIX 方式。
 
-打开 VS Code 命令面板（Windows：`Ctrl+Shift+P`），运行 **Extensions: Install from VSIX…**，选择 `pi-agent-coding-1.0.4.vsix`。
+打开 VS Code 命令面板（Windows：`Ctrl+Shift+P`；macOS：`Cmd+Shift+P`），运行 **Extensions: Install from VSIX…**，选择 `pi-agent-coding-1.0.4.vsix`。
 
 如果从源码开始，在仓库根目录执行以下命令生成安装包：
 
@@ -113,13 +113,13 @@ code --install-extension .\pi-agent-coding-1.0.4.vsix
 
 在 VS Code 设置中搜索 `@ext:SilasPaul.pi-agent-coding`，或从侧栏的 **⋯ → 插件设置** 进入。
 
-| 设置                   | 默认值                      | 说明                                                                           |
-| ---------------------- | --------------------------- | ------------------------------------------------------------------------------ |
-| `pi.executablePath`    | 空，自动从 `PATH` 查找      | 本机 PI 入口的绝对路径；支持可执行文件、JS 入口及可识别的官方 / npm 脚本启动器 |
-| `pi.nodePath`          | 空，使用 `PATH` 中的 `node` | 运行 PI JS 入口时使用的 Node.js 可执行文件                                     |
-| `pi.requestTimeoutMs`  | `10000`                     | 普通控制请求的等待时间，单位毫秒                                               |
-| `pi.startupTimeoutMs`  | `60000`                     | PI 版本检测与启动握手的等待时间，单位毫秒                                      |
-| `pi.shutdownTimeoutMs` | `5000`                      | 断开时等待 PI 正常退出的时间，超时后清理本次启动的进程树                       |
+| 设置                   | 默认值                         | 说明                                                                           |
+| ---------------------- | ------------------------------ | ------------------------------------------------------------------------------ |
+| `pi.executablePath`    | 空，自动检查 `PATH` 与常见目录 | 本机 PI 入口的绝对路径；支持可执行文件、JS 入口及可识别的官方 / npm 脚本启动器 |
+| `pi.nodePath`          | 空，自动检查 Node.js 安装目录  | 运行 PI JS 入口时使用的 Node.js 可执行文件                                     |
+| `pi.requestTimeoutMs`  | `10000`                        | 普通控制请求的等待时间，单位毫秒                                               |
+| `pi.startupTimeoutMs`  | `60000`                        | PI 版本检测与启动握手的等待时间，单位毫秒                                      |
+| `pi.shutdownTimeoutMs` | `5000`                         | 断开时等待 PI 正常退出的时间，超时后清理本次启动的进程树                       |
 
 路径设置为机器级设置，请配置在 **用户设置**，不要写入仓库的 `.vscode/settings.json`。超时设置最小为 `1000` 毫秒；模型生成、压缩等长操作不使用普通控制请求的短超时。
 
@@ -135,7 +135,11 @@ code --install-extension .\pi-agent-coding-1.0.4.vsix
 }
 ```
 
-官方 `.ps1` / `.cmd` 启动器会优先解析到对应 JS 入口；插件不会执行任意自定义 shell 启动脚本。更改设置后，通过 **PI: Reconnect** 或侧栏重新连接使其生效。
+Windows 官方 `.ps1` / `.cmd` 启动器、npm shim 与 macOS npm 符号链接会解析到对应 JS 入口。macOS 官方托管安装器按 `current-version` 读取当前 PI 入口，每次重连重新解析，避免固定到旧版本；插件不执行任意自定义 shell 包装脚本。
+
+自动发现优先使用显式设置，其次使用 VS Code 继承的 `PATH`，然后检查常见安装位置：用户 `.local/bin`、PI 托管目录、Windows 用户 npm 目录与 Node.js 安装目录，以及 macOS 的 Apple Silicon / Intel Homebrew 路径。也识别 Volta、nvm 的默认版本、fnm 默认别名和已提供的 npm prefix 等位置；未覆盖的自定义布局仍需手动设置。发现的 Node 与安装目录会加入本次 PI 子进程的 PATH，不改写系统或 shell 配置。
+
+macOS 如果从 Dock 启动 VS Code 后提示找不到 PI，请先在终端运行 `command -v pi` 和 `command -v node` 核对安装。必要时将 PI 官方 JS 入口与 Node 的绝对路径分别填入 `pi.executablePath`、`pi.nodePath`。找不到 PI、找不到 Node、无法识别启动器和文件不可执行会分别提示；版本检测失败会附带有界 stderr 诊断。更改设置后，通过 **PI: Reconnect** 或侧栏重新连接使其生效。
 
 ## 日常使用
 
@@ -238,7 +242,7 @@ PI 默认注册在右侧辅助侧边栏，可与左侧文件资源管理器同�
 - **修改结果**：工具差异来自 PI 实际执行后的返回结果，不提供逐块审批、文件快照或自动回滚。
 - **工具与 MCP**：由 PI 自己加载和执行；插件通用展示工具结果，不建立第二套 MCP 客户端。真实 MCP / 扩展交互环境尚未验收。
 - **终端能力**：不桥接终端主题同步、自定义终端 UI 或交互登录。
-- **兼容性**：PI 1.5.2 是验证基线，不代表所有 PI 版本都兼容；macOS / Linux、完整辅助功能矩阵和长会话成功压缩尚未实测。
+- **兼容性**：PI 1.5.2 是验证基线，不代表所有 PI 版本都兼容；macOS 当前只验证连接、进程生命周期及现有扩展宿主用例，真实模型、MCP、完整辅助功能矩阵与长会话成功压缩仍未验收；Linux 尚未实测。
 
 插件自身的输入与展示限制如下，不代表 PI 或模型服务的限制：
 
@@ -272,7 +276,7 @@ npm run compile
 | `npm run compile`          | 构建扩展宿主与 Webview 产物                            |
 | `npm run package`          | 构建并生成 VSIX                                        |
 
-`test:vscode` 使用隔离的测试配置、扩展目录和临时工作区；Windows 下优先使用本机 VS Code，也可通过 `PI_TEST_VSCODE` 指定可执行文件。没有可用本机路径时，测试工具可能下载 VS Code。测试宿主中的模拟 PI 通过不代表真实模型或 MCP 验收通过。
+`test:vscode` 使用隔离的测试配置、扩展目录和临时工作区；Windows 与 macOS 下优先使用本机 VS Code，也可通过 `PI_TEST_VSCODE` 指定可执行文件。没有可用本机路径时，测试工具可能下载 VS Code。测试宿主中的模拟 PI 通过不代表真实模型或 MCP 验收通过。
 
 `test:webview` 使用现有 Playwright Core，本机 Windows 优先查找 Edge / Chrome，也可通过 `PI_TEST_BROWSER` 指定浏览器路径。截图输出到系统临时目录，属于浏览器夹具，不是原生 VS Code 截图。自动测试覆盖单元行为、模拟进程和原生 VS Code API；真实模型生成、真实扩展交互及完整历史数据尚未端到端验收。
 
@@ -291,3 +295,9 @@ npm run compile
 ## 许可证
 
 [MIT](LICENSE)。本仓库许可证适用于插件代码；打包依赖的许可与版权声明见 [第三方许可](THIRD_PARTY_NOTICES.txt)。本机安装的 PI 及相关服务遵循其各自的许可与条款。
+
+### Windows / macOS 兼容性验证
+
+新增 `.github/workflows/compatibility.yml`，在 Windows 与 macOS runner 上执行类型检查、单元测试、进程集成测试、构建及扩展宿主测试。本地通过不代表远端矩阵已通过；以实际 CI 结果为准。两平台均覆盖含空格和中文路径、stdin EOF、启动取消、协议损坏与强制清理子进程；macOS 使用插件独占的进程组，Windows 使用当前 PID 的 `taskkill /T`。
+
+本轮 macOS 实测：PI 1.5.2 在移除用户 PATH 且不配置入口的情况下自动发现并完成 `get_state` 握手；未发送模型请求。UI 样式未改动，未重新执行完整主题、缩放和响应式截图矩阵。

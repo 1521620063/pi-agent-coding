@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { expect, it, vi } from "vitest";
 import { SessionStore } from "../../src/state/session-store";
 import { QueueService } from "../../src/features/queues";
@@ -54,7 +56,7 @@ it("cycles models using PI and exposes only presentation fields", async () => {
 
 it("restores the newest workspace index before remembering the new session", async () => {
   const store = new SessionStore();
-  store.update({ workspace: "C:\\work" });
+  store.update({ workspace: resolve("test-workspace") });
   const request = vi.fn(async (cmd) =>
     cmd.type === "get_state"
       ? { sessionId: "old", sessionFile: "old.jsonl" }
@@ -65,7 +67,7 @@ it("restores the newest workspace index before remembering the new session", asy
   const memory = {
     get: () => [
       {
-        workspaceUri: "file:///C:/work",
+        workspaceUri: pathToFileURL(resolve("test-workspace")).href,
         sessionPath: "old.jsonl",
         sessionId: "old",
         lastOpenedAt: "2026-11-10",

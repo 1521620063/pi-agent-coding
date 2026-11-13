@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  rm,
+  symlink,
+  writeFile,
+  realpath,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -151,7 +158,7 @@ it("opens a workspace file at the requested line but rejects traversal and links
   await service.openReference("src/中文.ts:3:2");
   expect(host.showTextDocument).toHaveBeenCalledOnce();
   expect(host.openTextDocument.mock.calls[0][0].fsPath).toBe(
-    join(root, "src", "中文.ts"),
+    await realpath(join(root, "src", "中文.ts")),
   );
   await writeFile(join(tmp, "secret.txt"), "secret");
   await expect(service.openReference("../secret.txt")).rejects.toThrow();
@@ -207,7 +214,7 @@ it("opens a root-level file reference that includes a line number", async () => 
   await writeFile(join(root, "main.ts"), "content");
   await service.openReference("main.ts:2");
   expect(host.openTextDocument.mock.calls[0][0].fsPath).toBe(
-    join(root, "main.ts"),
+    await realpath(join(root, "main.ts")),
   );
 });
 

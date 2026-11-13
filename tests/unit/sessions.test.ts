@@ -1,10 +1,12 @@
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { expect, it, vi } from "vitest";
 import { SessionService } from "../../src/features/sessions";
 import { SessionStore } from "../../src/state/session-store";
 function setup(cancelled = false) {
   const store = new SessionStore();
   store.update({
-    workspace: "C:/work",
+    workspace: resolve("test-workspace"),
     session: { id: "old", path: "old.jsonl" },
     messages: [{ role: "user", content: "old" }],
     run: "running",
@@ -39,8 +41,12 @@ it("rebuilds the current branch through PI and scopes persisted references by wo
   await sessions.create();
   expect(store.getSnapshot().session?.id).toBe("new");
   expect(store.getSnapshot().messages[0].content).toBe("new");
-  expect(await sessions.list("file:///C:/work")).toHaveLength(1);
-  expect(await sessions.list("file:///C:/elsewhere")).toHaveLength(0);
+  expect(
+    await sessions.list(pathToFileURL(resolve("test-workspace")).href),
+  ).toHaveLength(1);
+  expect(
+    await sessions.list(pathToFileURL(resolve("other-workspace")).href),
+  ).toHaveLength(0);
 });
 
 it("publishes and removes only indexed history entries in the current workspace", async () => {
@@ -71,7 +77,9 @@ it("does not restore a disconnected session from a late message response", async
   await sessions.refresh();
   expect(store.getSnapshot().session?.id).toBe("old");
   expect(store.getSnapshot().messages[0].content).toBe("old");
-  expect(await sessions.list("file:///C:/work")).toEqual([]);
+  expect(
+    await sessions.list(pathToFileURL(resolve("test-workspace")).href),
+  ).toEqual([]);
 });
 
 it("does not rename a new session with an old request result", async () => {

@@ -21,22 +21,19 @@ it("terminates a live child after a fatal protocol error and preserves the error
     await pi.disconnect();
   }
 });
-it.skipIf(process.platform !== "win32")(
-  "forces shutdown of its owned Windows process tree after the EOF timeout",
-  async () => {
-    const pi = new PiController(new SessionStore(), {
-      executablePath: resolve("tests/fixtures/stubborn-pi.mjs"),
-      nodePath: process.execPath,
-      shutdownTimeoutMs: 100,
-    });
-    await pi.connect(pathToFileURL(process.cwd()).href);
-    const pid = pi.pid!;
-    const state = await pi.request({ type: "get_state" });
-    await pi.disconnect();
-    expect(() => process.kill(pid, 0)).toThrow();
-    expect(() => process.kill(state.childPid, 0)).toThrow();
-  },
-);
+it("forces shutdown of its owned process tree after the EOF timeout", async () => {
+  const pi = new PiController(new SessionStore(), {
+    executablePath: resolve("tests/fixtures/stubborn-pi.mjs"),
+    nodePath: process.execPath,
+    shutdownTimeoutMs: 100,
+  });
+  await pi.connect(pathToFileURL(process.cwd()).href);
+  const pid = pi.pid!;
+  const state = await pi.request({ type: "get_state" });
+  await pi.disconnect();
+  expect(() => process.kill(pid, 0)).toThrow();
+  expect(() => process.kill(state.childPid, 0)).toThrow();
+});
 it("cancels a connection while version detection is still running without starting a later RPC process", async () => {
   const store = new SessionStore();
   const pi = new PiController(store, {

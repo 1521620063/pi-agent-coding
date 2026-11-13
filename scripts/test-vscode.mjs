@@ -38,20 +38,37 @@ await writeFile(
     "window.restoreWindows": "none",
   }),
 );
-const localExecutable =
+const localExecutables =
   process.platform === "win32"
-    ? join(
-        process.env.LOCALAPPDATA ?? "",
-        "Programs",
-        "Microsoft VS Code",
-        "Code.exe",
-      )
-    : undefined;
+    ? [
+        join(
+          process.env.LOCALAPPDATA ?? "",
+          "Programs",
+          "Microsoft VS Code",
+          "Code.exe",
+        ),
+        join(process.env.ProgramFiles ?? "", "Microsoft VS Code", "Code.exe"),
+      ]
+    : process.platform === "darwin"
+      ? ["/Applications", join(process.env.HOME ?? "", "Applications")].flatMap(
+          (directory) =>
+            ["Code", "Electron"].map((binary) =>
+              join(
+                directory,
+                "Visual Studio Code.app",
+                "Contents",
+                "MacOS",
+                binary,
+              ),
+            ),
+        )
+      : [];
 let vscodeExecutablePath = process.env.PI_TEST_VSCODE;
-if (!vscodeExecutablePath && localExecutable) {
+for (const candidate of localExecutables) {
+  if (vscodeExecutablePath) break;
   try {
-    await access(localExecutable);
-    vscodeExecutablePath = localExecutable;
+    await access(candidate);
+    vscodeExecutablePath = candidate;
   } catch {}
 }
 await runTests({
