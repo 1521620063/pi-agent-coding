@@ -76,6 +76,7 @@ it("keeps expanded groups, tools and their focus stable as more operations arriv
   const button = read.querySelector("button")!;
   document.body.append(container);
   button.focus();
+  state.run = "running";
   state.messages.splice(6, 0, {
     role: "assistant",
     content: [{ type: "toolCall", id: "third", name: "custom_mcp" }],

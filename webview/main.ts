@@ -3,7 +3,7 @@ import type {
   HostMessage,
   ViewState,
 } from "../src/shared/bridge";
-import { renderChat, shouldSend, element } from "./chat";
+import { renderChat, updateActivityElapsed, shouldSend, element } from "./chat";
 import {
   formButton,
   type FormButton,
@@ -36,6 +36,10 @@ const promptText = () => prompt.value ?? "";
 const restored = vscode.getState();
 prompt.value = restored?.draft ?? "";
 let state: ViewState | undefined;
+window.setInterval(() => {
+  if (!document.hidden && state?.run === "running")
+    updateActivityElapsed(byId("transcript"));
+}, 1000);
 let submitting = false;
 let stoppingFromPrompt = false;
 let promotingRevision: number | undefined;
@@ -366,7 +370,7 @@ function renderState() {
       working.setAttribute("aria-label", "PI 正在工作");
       const spinner = element("span", "working-spinner");
       spinner.setAttribute("aria-hidden", "true");
-      working.append(spinner, document.createTextNode("Working"));
+      working.append(spinner, element("span", "working-label", "Working"));
       activity.append(working);
     }
   } else if (state.compaction.result?.summary) {

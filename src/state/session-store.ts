@@ -61,11 +61,25 @@ export class SessionStore {
     )
       this.revision++;
     Object.assign(this.state, patch);
-    this.emit(Object.keys(patch) as (keyof ViewState)[]);
+    const changed = Object.keys(patch) as (keyof ViewState)[];
+    if (patch.run === "running" && this.state.runStartedAt === undefined) {
+      this.state.runStartedAt = Date.now();
+      changed.push("runStartedAt");
+    }
+    if (
+      patch.run === "idle" ||
+      (patch.connection && patch.connection !== "connected")
+    ) {
+      this.state.generation = undefined;
+      this.state.runStartedAt = undefined;
+      changed.push("generation", "runStartedAt");
+    }
+    this.emit(changed);
   }
   replaceMessages(messages: AgentMessage[]): void {
     messages = messages.filter(validMessage);
     this.activeMessage = undefined;
+    this.state.generation = undefined;
     this.state.messages = structuredClone(messages);
     this.state.tools = [];
     const calls = new Map(
@@ -94,7 +108,7 @@ export class SessionStore {
           result: { content: message.content, details: message.details },
           status: message.isError ? "error" : "success",
         });
-    this.emit(["messages", "tools"]);
+    this.emit(["messages", "tools", "generation"]);
   }
   apply(record: PiRecord): void {
     const state = this.state;
@@ -102,18 +116,23 @@ export class SessionStore {
     switch (record.type) {
       case "agent_start":
         state.run = "running";
-        changed = ["run"];
+        state.runStartedAt ??= Date.now();
+        state.generation = undefined;
+        changed = ["run", "runStartedAt", "generation"];
         break;
       case "agent_settled":
         state.run = "idle";
+        state.runStartedAt = undefined;
+        state.generation = undefined;
         state.retry = { ...state.retry, active: false };
-        changed = ["run", "retry"];
+        changed = ["run", "retry", "runStartedAt", "generation"];
         break;
       case "message_start":
         if (!validMessage(record.message)) return;
         this.activeMessage = state.messages.length;
         state.messages.push(structuredClone(record.message));
-        changed = ["messages"];
+        state.generation = undefined;
+        changed = ["messages", "generation"];
         break;
       case "message_update": {
         const event = record.assistantMessageEvent;
@@ -161,7 +180,20 @@ export class SessionStore {
         else if (event.type === "toolcall_end" && isObject(event.toolCall))
           message.content[index] = event.toolCall;
         if (record.usage) message.usage = record.usage;
-        changed = ["messages"];
+        const kind = event.type.startsWith("thinking_")
+          ? "thinking"
+          : event.type.startsWith("text_")
+            ? "text"
+            : event.type.startsWith("toolcall_")
+              ? "toolCall"
+              : undefined;
+        if (kind) {
+          // End events finish a phase, not the run. Only agent_settled is idle.
+          state.generation = event.type.endsWith("_end")
+            ? undefined
+            : { kind, messageIndex: this.activeMessage, contentIndex: index };
+        }
+        changed = ["messages", "generation"];
         break;
       }
       case "message_end":
@@ -170,7 +202,8 @@ export class SessionStore {
           state.messages[this.activeMessage] = structuredClone(record.message);
         else state.messages.push(structuredClone(record.message));
         this.activeMessage = undefined;
-        changed = ["messages"];
+        state.generation = undefined;
+        changed = ["messages", "generation"];
         break;
       case "tool_execution_start":
       case "tool_execution_update":
@@ -222,8 +255,10 @@ export class SessionStore {
       case "summarization_retry_scheduled":
       case "summarization_retry_attempt_start":
         state.run = "running";
+        state.runStartedAt ??= Date.now();
+        state.generation = undefined;
         state.retry = { ...state.retry, ...record, active: true };
-        changed = ["run", "retry"];
+        changed = ["run", "retry", "runStartedAt", "generation"];
         break;
       case "auto_retry_end":
       case "summarization_retry_finished":

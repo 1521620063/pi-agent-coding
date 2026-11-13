@@ -21,6 +21,7 @@ const fixture = await build({
     sessions:[{sessionId:'one',sessionPath:'one.jsonl',lastOpenedAt:'2026-11-12'},{sessionId:'two',sessionPath:'two.jsonl',lastOpenedAt:'2026-11-12'}]});
   store.replaceMessages([{role:'user',content:'你好'},{role:'assistant',content:'示例代码\\n\\n\u0060\u0060\u0060ts\\nconst answer = 42;\\n\u0060\u0060\u0060\\n[source](main.ts:2)'}]);
   window.actions=[]; window.fixtureState=store.getSnapshot();
+  window.newActivityStore=()=>new SessionStore();
   window.deliver=(data)=>window.dispatchEvent(new MessageEvent('message',{data}));
   window.acquireVsCodeApi=()=>({getState:()=>({draft:'保留草稿'}),setState:(s)=>window.saved=s,postMessage:(action)=>{
     window.actions.push(action);
@@ -722,12 +723,12 @@ try {
   const spinnerFrame = () =>
     page
       .locator(".working-spinner")
-      .evaluate((node) => getComputedStyle(node, "::before").content);
+      .evaluate((node) => getComputedStyle(node, "::before").transform);
   const firstFrame = await spinnerFrame();
   await page.waitForFunction(
     (first) =>
       getComputedStyle(document.querySelector(".working-spinner"), "::before")
-        .content !== first,
+        .transform !== first,
     firstFrame,
   );
   await page.evaluate(() =>
@@ -739,14 +740,58 @@ try {
     ),
     "Streaming updates should preserve the active spinner",
   );
-  await page.emulateMedia({ reducedMotion: "reduce" });
   assert.equal(
-    await page
-      .locator(".working-spinner")
-      .evaluate((node) => getComputedStyle(node, "::before").animationName),
+    await working
+      .locator(".working-label")
+      .evaluate((node) => getComputedStyle(node).animationName),
+    "working-shimmer",
+  );
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  for (const pseudo of ["::before", "::after"])
+    assert.equal(
+      await working
+        .locator(".working-spinner")
+        .evaluate(
+          (node, pseudo) => getComputedStyle(node, pseudo).animationName,
+          pseudo,
+        ),
+      "none",
+    );
+  assert.equal(
+    await working
+      .locator(".working-label")
+      .evaluate((node) => getComputedStyle(node).animationName),
     "none",
   );
-  await page.emulateMedia({ reducedMotion: "no-preference" });
+  assert.equal(
+    await working
+      .locator(".working-label")
+      .evaluate(
+        (node) =>
+          getComputedStyle(node).webkitTextFillColor === "rgba(0, 0, 0, 0)",
+      ),
+    false,
+  );
+  await page.emulateMedia({
+    reducedMotion: "no-preference",
+    forcedColors: "active",
+  });
+  assert.equal(
+    await working
+      .locator(".working-label")
+      .evaluate((node) => getComputedStyle(node).backgroundImage),
+    "none",
+  );
+  assert.equal(
+    await working
+      .locator(".working-label")
+      .evaluate(
+        (node) =>
+          getComputedStyle(node).webkitTextFillColor === "rgba(0, 0, 0, 0)",
+      ),
+    false,
+  );
+  await page.emulateMedia({ forcedColors: "none" });
   // A long transcript must keep historical selection, focus and scroll while
   // only the active reply changes. This remains a browser fixture, not PI E2E.
   const streaming = await page.evaluate(() => {
@@ -759,7 +804,17 @@ try {
         "保留历史正文与代码。".repeat(30) +
         (index % 2 ? "\n\n```ts\nconst answer = 42;\n```" : ""),
     }));
-    state.messages.push({ role: "assistant", content: "正在生成" });
+    state.messages.push({ role: "user", content: "当前问题" });
+    state.messages.push({
+      role: "assistant",
+      content: [{ type: "thinking", thinking: "正在分析" }],
+    });
+    state.run = "running";
+    state.generation = {
+      kind: "thinking",
+      messageIndex: state.messages.length - 1,
+      contentIndex: 0,
+    };
     window.deliver({ type: "snapshot", state });
     const transcript = document.getElementById("transcript");
     const historical = [...transcript.children].slice(0, 100);
@@ -776,7 +831,9 @@ try {
     const samples = [];
     for (let index = 0; index < 30; index++) {
       const next = structuredClone(state);
-      next.messages.at(-1).content += " 流式新增内容".repeat(index + 1);
+      next.messages.at(-1).content[0].thinking += " 流式新增思考".repeat(
+        index + 1,
+      );
       const start = performance.now();
       window.deliver({ type: "snapshot", state: next });
       samples.push(performance.now() - start);
@@ -1072,9 +1129,296 @@ try {
           "none",
         );
         await page.emulateMedia({ reducedMotion: "no-preference" });
+        // Live activity uses real SessionStore events, with native disclosure,
+        // bounded previews and keyboard choices checked in every render case.
+        await page.evaluate(() => {
+          const store = window.newActivityStore();
+          store.update({
+            ...window.fixtureState,
+            session: { id: crypto.randomUUID() },
+            run: "idle",
+            messages: [],
+            tools: [],
+            pendingUi: [],
+            retry: {},
+            compaction: {},
+          });
+          store.replaceMessages([
+            { role: "user", content: "检查当前活动与思考预览" },
+          ]);
+          window.liveStore = store;
+          window.publishActivity = () =>
+            window.deliver({ type: "snapshot", state: store.getSnapshot() });
+          store.apply({ type: "agent_start" });
+          window.publishActivity();
+        });
+        const liveExecution = page.locator(".execution");
+        const liveSummary = liveExecution.locator(":scope > summary");
+        const livePreview = liveExecution.locator(".execution-preview");
+        assert.match(await liveSummary.textContent(), /等待响应/);
+        if (theme === "dark" && width === 320 && zoom === 1) {
+          const elapsed = await liveExecution
+            .locator(".execution-elapsed")
+            .textContent();
+          await page.waitForFunction(
+            (previous) =>
+              document.querySelector(".execution-elapsed").textContent !==
+              previous,
+            elapsed,
+          );
+        }
+        assert.equal(await liveExecution.evaluate((node) => node.open), false);
+        await page.evaluate(() => {
+          window.liveStore.apply({
+            type: "message_start",
+            message: { role: "assistant", content: [] },
+          });
+          window.liveStore.apply({
+            type: "message_update",
+            assistantMessageEvent: {
+              type: "thinking_delta",
+              contentIndex: 0,
+              delta:
+                "先核对项目配置与入口。\n" +
+                "接着检查状态归并与界面更新。\n".repeat(80) +
+                "<script>原样展示</script>",
+            },
+          });
+          window.publishActivity();
+        });
+        assert.match(await liveSummary.textContent(), /思考中/);
+        assert.equal(await livePreview.isVisible(), true);
+        assert.equal(await livePreview.locator("script").count(), 0);
+        assert.ok((await livePreview.textContent()).length <= 600);
+        const previewLayout = await livePreview.evaluate((node) => ({
+          height: node.getBoundingClientRect().height,
+          lineHeight: parseFloat(getComputedStyle(node).lineHeight),
+          zoom: parseFloat(document.body.style.zoom || "1"),
+        }));
+        assert.ok(
+          previewLayout.height <=
+            (previewLayout.lineHeight * 3 + 9) * previewLayout.zoom,
+          `Preview must stay within three lines: ${theme} ${width} ${zoom}`,
+        );
+        await liveSummary.scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: join(
+            artifacts,
+            `activity-thinking-${theme}-${width}-${zoom}.png`,
+          ),
+          fullPage: true,
+        });
+        assert.equal(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth > window.innerWidth + 1,
+          ),
+          false,
+        );
+        await page.evaluate(() => {
+          window.liveStore.apply({
+            type: "message_update",
+            assistantMessageEvent: {
+              type: "thinking_end",
+              contentIndex: 0,
+              content: "配置检查思路",
+            },
+          });
+          window.liveStore.apply({
+            type: "message_update",
+            assistantMessageEvent: {
+              type: "text_delta",
+              contentIndex: 1,
+              delta: "我先运行检查。",
+            },
+          });
+          window.publishActivity();
+        });
+        assert.equal(await livePreview.isVisible(), false);
+        assert.match(await liveSummary.textContent(), /正在生成回复/);
+        assert.equal(
+          await page
+            .locator("#transcript > .assistant-message .markdown")
+            .isVisible(),
+          true,
+        );
+        await page.evaluate(() => {
+          window.liveStore.apply({
+            type: "message_end",
+            message: {
+              role: "assistant",
+              content: [
+                { type: "thinking", thinking: "配置检查思路" },
+                { type: "text", text: "我先运行检查。" },
+                {
+                  type: "toolCall",
+                  id: "live-check",
+                  name: "bash",
+                  arguments: { command: "npm run check" },
+                },
+              ],
+            },
+          });
+          window.liveStore.apply({
+            type: "tool_execution_start",
+            toolCallId: "live-check",
+            toolName: "bash",
+            args: { command: "npm run check" },
+          });
+          window.liveStore.apply({
+            type: "tool_execution_update",
+            toolCallId: "live-check",
+            toolName: "bash",
+            partialResult: {
+              content: [
+                {
+                  type: "text",
+                  text: "正在检查类型\n".repeat(80) + "最新检查进度",
+                },
+              ],
+            },
+          });
+          window.publishActivity();
+        });
+        assert.match(await liveSummary.textContent(), /正在执行/);
+        assert.equal(await livePreview.isVisible(), true);
+        assert.match(await livePreview.textContent(), /最新检查进度/);
+        await liveSummary.scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: join(artifacts, `activity-tool-${theme}-${width}-${zoom}.png`),
+          fullPage: true,
+        });
+        await liveSummary.focus();
+        await page.keyboard.press("Enter");
+        assert.equal(await liveExecution.evaluate((node) => node.open), true);
+        assert.equal(await livePreview.isVisible(), false);
+        await page.keyboard.press("Space");
+        assert.equal(await liveExecution.evaluate((node) => node.open), false);
+        await page.evaluate(() => {
+          window.liveStore.apply({
+            type: "tool_execution_end",
+            toolCallId: "live-check",
+            toolName: "bash",
+            result: { content: [{ type: "text", text: "检查通过" }] },
+          });
+          window.liveStore.apply({
+            type: "message_start",
+            message: { role: "assistant", content: [] },
+          });
+          window.liveStore.apply({
+            type: "message_update",
+            assistantMessageEvent: {
+              type: "thinking_delta",
+              contentIndex: 0,
+              delta: "整理最终结论",
+            },
+          });
+          window.publishActivity();
+        });
+        assert.match(await liveSummary.textContent(), /思考中/);
+        assert.equal(
+          await livePreview.isVisible(),
+          false,
+          "Manual collapse must suppress subsequent previews",
+        );
+        await liveSummary.focus();
+        await page.keyboard.press("Enter");
+        await page.evaluate(() => {
+          window.liveStore.apply({
+            type: "message_end",
+            message: {
+              role: "assistant",
+              content: [{ type: "text", text: "检查完成" }],
+            },
+          });
+          window.liveStore.apply({ type: "agent_settled" });
+          window.publishActivity();
+        });
+        assert.equal(
+          await liveExecution.evaluate((node) => node.open),
+          true,
+          "Settlement must respect manual expansion",
+        );
+        assert.equal(
+          await liveExecution.locator(".execution-elapsed").isVisible(),
+          false,
+        );
+        // A new turn resets the preview choice. Default previews fold only when
+        // settled; agent_end alone leaves a live waiting indicator.
+        await page.evaluate(() => {
+          window.liveStore.apply({
+            type: "message_start",
+            message: { role: "user", content: "继续检查" },
+          });
+          window.liveStore.apply({
+            type: "message_end",
+            message: { role: "user", content: "继续检查" },
+          });
+          window.liveStore.apply({ type: "agent_start" });
+          window.liveStore.apply({
+            type: "message_start",
+            message: { role: "assistant", content: [] },
+          });
+          window.liveStore.apply({
+            type: "message_update",
+            assistantMessageEvent: {
+              type: "thinking_delta",
+              contentIndex: 0,
+              delta: "新一轮思考",
+            },
+          });
+          window.publishActivity();
+        });
+        const nextExecution = page.locator(".execution").last();
+        assert.equal(
+          await nextExecution.locator(".execution-preview").isVisible(),
+          true,
+        );
+        await page.evaluate(() => {
+          window.liveStore.apply({
+            type: "message_end",
+            message: {
+              role: "assistant",
+              content: [{ type: "thinking", thinking: "新一轮思考" }],
+            },
+          });
+          window.liveStore.apply({ type: "agent_end" });
+          window.publishActivity();
+        });
+        assert.equal(
+          await nextExecution.evaluate((node) =>
+            node.classList.contains("is-running"),
+          ),
+          true,
+        );
+        await page.evaluate(() => {
+          window.liveStore.apply({ type: "agent_settled" });
+          window.publishActivity();
+        });
+        assert.equal(await nextExecution.evaluate((node) => node.open), false);
+        assert.equal(
+          await nextExecution.locator(".execution-preview").isVisible(),
+          false,
+        );
+        assert.match(
+          await nextExecution.locator(".execution-label").textContent(),
+          /执行过程/,
+        );
         await page.evaluate(() =>
           window.deliver({ type: "snapshot", state: window.fixtureState }),
         );
+        const workingLabel = page.locator("#activity .working-label");
+        assert.equal(await workingLabel.isVisible(), true);
+        assert.equal(
+          await workingLabel.evaluate(
+            (node) => getComputedStyle(node).animationName,
+          ),
+          theme === "contrast" ? "none" : "working-shimmer",
+        );
+        await page
+          .locator("#activity")
+          .screenshot({
+            path: join(artifacts, `working-${theme}-${width}-${zoom}.png`),
+          });
         await page.screenshot({
           path: join(artifacts, `${theme}-${width}-${zoom}.png`),
           fullPage: true,

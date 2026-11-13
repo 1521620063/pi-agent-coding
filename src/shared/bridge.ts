@@ -36,6 +36,12 @@ export interface ViewState {
   workspace?: string;
   session?: { id: string; path?: string; name?: string };
   run: "idle" | "running";
+  runStartedAt?: number;
+  generation?: {
+    kind: "thinking" | "text" | "toolCall";
+    messageIndex: number;
+    contentIndex: number;
+  };
   messages: AgentMessage[];
   tools: ToolView[];
   queues: { steering: string[]; followUp: string[] };

@@ -595,6 +595,36 @@ main {
   font-size: var(--pi-font-compact);
   color: var(--pi-muted);
 }
+.execution-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  max-height: 4.8em;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid var(--pi-line);
+  color: var(--pi-thinking);
+  font-size: var(--pi-font-small);
+  line-height: 1.6;
+  font-weight: normal;
+}
+.execution-preview[hidden],
+.execution[open] .execution-preview {
+  display: none;
+}
+.execution-elapsed {
+  color: var(--pi-muted);
+  font-size: var(--pi-font-compact);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.execution > summary:focus-visible {
+  outline: 1px solid var(--pi-focus);
+  outline-offset: 2px;
+}
 .execution-chevron {
   width: 6px;
   height: 6px;
@@ -920,51 +950,136 @@ input[type="checkbox"] {
 .working {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+  min-height: 22px;
+  line-height: 1.5;
 }
 .working-spinner {
-  flex: 0 0 1ch;
-  width: 1ch;
+  position: relative;
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
   color: var(--pi-accent);
-  font-family: var(--vscode-editor-font-family, monospace);
-  line-height: 1;
+}
+.working-spinner::before,
+.working-spinner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 .working-spinner::before {
-  content: "⠋";
-  animation: working-dots 800ms step-end infinite;
+  background: currentColor;
+  clip-path: polygon(
+    50% 0,
+    62% 36%,
+    100% 50%,
+    62% 64%,
+    50% 100%,
+    38% 64%,
+    0 50%,
+    38% 36%
+  );
+  animation: working-spark 2.8s ease-in-out infinite;
 }
-@keyframes working-dots {
-  10% {
-    content: "⠙";
-  }
-  20% {
-    content: "⠹";
-  }
-  30% {
-    content: "⠸";
-  }
-  40% {
-    content: "⠼";
+.working-spinner::after {
+  inset: -5px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--pi-accent) 18%, transparent),
+    transparent 70%
+  );
+  animation: working-glow 2.8s ease-in-out infinite;
+}
+.working-label {
+  color: var(--pi-accent);
+  font-weight: 500;
+  letter-spacing: 0.025em;
+  background: linear-gradient(
+    105deg,
+    var(--pi-muted) 0%,
+    var(--pi-muted) 35%,
+    var(--pi-accent) 48%,
+    var(--pi-fg) 52%,
+    var(--pi-muted) 65%,
+    var(--pi-muted) 100%
+  );
+  background-size: 260% 100%;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: working-shimmer 3.6s ease-in-out infinite;
+}
+@keyframes working-spark {
+  0% {
+    transform: rotate(0deg) scale(0.8);
+    opacity: 0.65;
   }
   50% {
-    content: "⠴";
+    transform: rotate(90deg) scale(1);
+    opacity: 1;
   }
-  60% {
-    content: "⠦";
+  100% {
+    transform: rotate(180deg) scale(0.8);
+    opacity: 0.65;
   }
-  70% {
-    content: "⠧";
+}
+@keyframes working-glow {
+  0%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.35;
   }
-  80% {
-    content: "⠇";
+  50% {
+    transform: scale(1.15);
+    opacity: 0.8;
   }
-  90% {
-    content: "⠏";
+}
+@keyframes working-shimmer {
+  0%,
+  15% {
+    background-position: 100% 50%;
+  }
+  85%,
+  100% {
+    background-position: 0% 50%;
+  }
+}
+.vscode-high-contrast .working-label,
+.vscode-high-contrast-light .working-label {
+  background: none;
+  color: var(--pi-fg);
+  -webkit-text-fill-color: currentColor;
+  animation: none;
+}
+.vscode-high-contrast .working-spinner::after,
+.vscode-high-contrast-light .working-spinner::after {
+  display: none;
+}
+@media (forced-colors: active) {
+  .working-label {
+    background: none;
+    color: CanvasText;
+    -webkit-text-fill-color: currentColor;
+    animation: none;
+  }
+  .working-spinner::before {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+  .working-spinner::after {
+    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .working-spinner::before {
+  .working-spinner::before,
+  .working-spinner::after,
+  .working-label {
     animation: none;
+  }
+  .working-label {
+    background: none;
+    -webkit-text-fill-color: currentColor;
   }
 }
 #queue {

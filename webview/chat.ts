@@ -71,6 +71,11 @@ interface ActivityNode {
   count: HTMLElement;
   failure: HTMLElement;
   current: HTMLElement;
+  preview: HTMLElement;
+  elapsed: HTMLElement;
+  previewSuppressed: boolean;
+  wasActive: boolean;
+  interrupted: boolean;
   body: HTMLElement;
 }
 interface ChatCache {
@@ -177,6 +182,15 @@ export function renderChat(
     )
       cache.messages.delete(index);
   const children: HTMLElement[] = [];
+  let lastUser = -1;
+  for (const [index, message] of state.messages.entries())
+    if (message.role === "user") lastUser = index;
+  const activeKey = lastUser + 1;
+  const live =
+    state.connection === "connected" &&
+    (state.run === "running" ||
+      !!state.compaction.active ||
+      state.pendingUi.length > 0);
   const membership = query
     ? new Map<number, number>()
     : activityMembership(state.messages);
@@ -186,8 +200,8 @@ export function renderChat(
   >();
   const appendActivity = (
     key: number,
-    node: HTMLElement,
-    toolIds: string[],
+    node?: HTMLElement,
+    toolIds: string[] = [],
   ) => {
     let activity = activities.get(key);
     if (!activity) {
@@ -197,18 +211,23 @@ export function renderChat(
       if (!cached) {
         const details = element("details", "execution");
         const summary = element("summary", "execution-summary");
+        summary.title = "展开或收起完整执行过程；运行预览最多显示三行";
         const icon = element("span", "execution-icon");
         icon.setAttribute("aria-hidden", "true");
         const heading = element("span", "execution-heading");
         const labels = element("span", "execution-labels");
         const label = element("span", "execution-label");
+        label.setAttribute("role", "status");
         const count = element("span", "execution-count");
         const failure = element("span", "execution-failure");
+        const elapsed = element("span", "execution-elapsed");
         const current = element("span", "execution-current");
+        const preview = element("span", "execution-preview");
+        preview.hidden = true;
         const chevron = element("span", "execution-chevron");
         chevron.setAttribute("aria-hidden", "true");
-        labels.append(label, count, failure);
-        heading.append(labels, current);
+        labels.append(label, count, failure, elapsed);
+        heading.append(labels, current, preview);
         summary.append(icon, heading, chevron);
         const body = element("div", "execution-body");
         details.append(summary, body);
@@ -219,19 +238,33 @@ export function renderChat(
           count,
           failure,
           current,
+          preview,
+          elapsed,
+          previewSuppressed: false,
+          wasActive: false,
+          interrupted: false,
           body,
         };
+        const activityNode = cached;
+        details.addEventListener("toggle", () => {
+          // Native disclosure is only changed by the user. Keep their choice
+          // through subsequent phases; streaming must never reopen a disclosure.
+          activityNode.previewSuppressed = !details.open;
+          if (!details.open) activityNode.preview.hidden = true;
+        });
         cache.activities.set(key, cached);
       }
       children.push(cached.node);
     }
-    activity.children.push(node);
+    if (node) activity.children.push(node);
     for (const id of toolIds) activity.tools.add(id);
   };
   const shown = new Set<string>();
   const normalizedQuery = query.toLocaleLowerCase();
   for (const [index, message] of state.messages.entries()) {
     if (message.role === "toolResult") continue;
+    if (!query && live && index > lastUser && !activities.has(activeKey))
+      appendActivity(activeKey);
     const text =
       typeof message.content === "string"
         ? message.content
@@ -303,9 +336,7 @@ export function renderChat(
     if (activityKey === undefined) children.push(cached.node);
     else appendActivity(activityKey, cached.node, toolIds);
   }
-  let lastUser = -1;
-  for (const [index, message] of state.messages.entries())
-    if (message.role === "user") lastUser = index;
+  if (!query && live && !activities.has(activeKey)) appendActivity(activeKey);
   for (const tool of state.tools)
     if (!query && !shown.has(tool.id)) {
       const key =
@@ -318,21 +349,89 @@ export function renderChat(
     const records = [...activity.tools].map((id) => toolRecords.get(id)!);
     const pending = records.filter((tool) => tool.status === "pending");
     const errors = records.filter((tool) => tool.status === "error").length;
-    const interrupted = pending.length > 0 && state.connection !== "connected";
+    const active = live && key === activeKey;
+    if (active) cached.interrupted = false;
+    else if (cached.wasActive && state.connection !== "connected")
+      cached.interrupted = true;
+    cached.wasActive = active;
+    const interrupted = cached.interrupted || (pending.length > 0 && !active);
+    const generation = active ? state.generation : undefined;
+    const waitingUi = active && state.pendingUi.length > 0;
+    const retrying = active && !!state.retry.active;
+    const compacting = active && !!state.compaction.active;
     const label = interrupted
       ? "执行已中断"
-      : pending.length
-        ? "正在执行"
-        : "执行过程";
+      : waitingUi
+        ? "等待你的操作"
+        : retrying
+          ? "正在重试"
+          : compacting
+            ? "正在压缩上下文"
+            : pending.length
+              ? "正在执行"
+              : generation?.kind === "thinking"
+                ? "思考中"
+                : generation?.kind === "text"
+                  ? "正在生成回复"
+                  : generation?.kind === "toolCall"
+                    ? "正在准备工具"
+                    : active
+                      ? "等待响应"
+                      : "执行过程";
     const count = records.length ? `${records.length} 项操作` : "";
     const failure = errors ? `${errors} 项失败` : "";
     const latest =
-      pending.length && !interrupted
+      pending.length && !interrupted && !waitingUi && !retrying && !compacting
         ? toolDescription(pending.at(-1)!)
         : undefined;
-    const current = latest
-      ? `${latest.action}${latest.target ? ` · ${latest.target}` : ""}`
-      : "";
+    const current = waitingUi
+      ? "请查看 VS Code 中的交互提示"
+      : retrying
+        ? `第 ${state.retry.attempt ?? "未知"} 次 · ${String(state.retry.errorMessage ?? "等待 PI 重试")}`
+        : latest
+          ? `${latest.action}${latest.target ? ` · ${latest.target}` : ""}`
+          : "";
+    let preview = "";
+    if (active && !waitingUi && !retrying && !compacting) {
+      if (latest) {
+        const tool = pending.at(-1)!;
+        const content = tool.result?.content;
+        // Bound the preview without copying an unbounded tool output.
+        if (Array.isArray(content)) {
+          for (const block of content)
+            if (
+              isObject(block) &&
+              block.type === "text" &&
+              typeof block.text === "string"
+            )
+              preview = (preview + block.text.slice(-600)).slice(-600);
+        }
+        preview ||= latest.target;
+      } else if (generation?.kind === "thinking") {
+        const message = state.messages[generation.messageIndex];
+        const block = Array.isArray(message?.content)
+          ? message.content[generation.contentIndex]
+          : undefined;
+        if (block?.type === "thinking" && typeof block.thinking === "string")
+          preview = block.thinking.slice(-600);
+      }
+    }
+    if (cached.preview.textContent !== preview)
+      cached.preview.textContent = preview;
+    const hidePreview = !preview || cached.previewSuppressed;
+    if (cached.preview.hidden !== hidePreview)
+      cached.preview.hidden = hidePreview;
+    if (active && state.runStartedAt !== undefined) {
+      const startedAt = String(state.runStartedAt);
+      if (cached.elapsed.dataset.startedAt !== startedAt)
+        cached.elapsed.dataset.startedAt = startedAt;
+    } else if (cached.elapsed.dataset.startedAt !== undefined) {
+      delete cached.elapsed.dataset.startedAt;
+      cached.elapsed.textContent = "";
+    }
+    const hideElapsed = !active || state.runStartedAt === undefined;
+    if (cached.elapsed.hidden !== hideElapsed)
+      cached.elapsed.hidden = hideElapsed;
     const summary = [label, count, failure, current]
       .filter(Boolean)
       .join(" · ");
@@ -347,7 +446,7 @@ export function renderChat(
       if (node.textContent !== text) node.textContent = text;
       if (node.hidden !== !text) node.hidden = !text;
     }
-    const className = `execution${errors || interrupted ? " has-error" : ""}${pending.length && !interrupted ? " is-running" : ""}`;
+    const className = `execution${errors || interrupted ? " has-error" : ""}${active && !waitingUi ? " is-running" : ""}`;
     if (cached.node.className !== className) cached.node.className = className;
     reconcileChildren(cached.body, activity.children);
   }
@@ -362,7 +461,7 @@ export function renderChat(
     );
     children.push(cache.noMatches);
   }
-  if (!state.messages.length) {
+  if (!state.messages.length && !live) {
     if (!cache.empty) {
       cache.empty = element("div", "empty");
       cache.empty.append(
@@ -374,7 +473,28 @@ export function renderChat(
     children.push(cache.empty);
   }
   reconcileChildren(container, children);
+  updateActivityElapsed(container);
   if (nearBottom) container.scrollTop = container.scrollHeight;
+}
+
+// Updating only these labels keeps selection, focus and transcript scroll intact.
+export function updateActivityElapsed(
+  container: HTMLElement,
+  now = Date.now(),
+) {
+  for (const elapsed of container.querySelectorAll<HTMLElement>(
+    ".execution-elapsed[data-started-at]",
+  )) {
+    const seconds = Math.max(
+      0,
+      Math.floor((now - Number(elapsed.dataset.startedAt)) / 1000),
+    );
+    const text =
+      seconds < 60
+        ? `${seconds} 秒`
+        : `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
+    if (elapsed.textContent !== text) elapsed.textContent = text;
+  }
 }
 function renderContent(
   node: HTMLElement,
