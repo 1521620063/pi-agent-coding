@@ -981,8 +981,8 @@ input[type="checkbox"] {
 }
 .working-glyph {
   display: inline-block;
-  animation: working-wave 2.2s linear infinite both;
-  animation-delay: calc(var(--glyph-index, 0) * 0.315s - 2.2s);
+  animation: working-wave 1.2s infinite both;
+  animation-delay: calc(var(--glyph-index, 0) * 0.171s - 1.2s);
 }
 @keyframes activity-heartbeat {
   from {
@@ -994,11 +994,18 @@ input[type="checkbox"] {
 }
 @keyframes working-wave {
   0% {
+    opacity: 0.68;
+    transform: translateY(0);
+    text-shadow: 0 0 0 transparent;
+    animation-timing-function: cubic-bezier(0.33, 0, 0.2, 1);
+  }
+  14% {
     opacity: 1;
     transform: translateY(-1.5px);
     text-shadow: 0 0 9px color-mix(in srgb, var(--pi-accent) 72%, transparent);
+    animation-timing-function: cubic-bezier(0.33, 0, 0.2, 1);
   }
-  22%,
+  30%,
   100% {
     opacity: 0.68;
     transform: translateY(0);
