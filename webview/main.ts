@@ -3,7 +3,13 @@ import type {
   HostMessage,
   ViewState,
 } from "../src/shared/bridge";
-import { renderChat, updateActivityElapsed, shouldSend, element } from "./chat";
+import {
+  renderChat,
+  updateActivityElapsed,
+  shouldSend,
+  element,
+  activityPulse,
+} from "./chat";
 import {
   formButton,
   type FormButton,
@@ -370,9 +376,14 @@ function renderState() {
       working.setAttribute("aria-label", "PI 正在工作");
       const spinner = element("span", "working-spinner");
       spinner.setAttribute("aria-hidden", "true");
-      for (let index = 0; index < 3; index++)
-        spinner.append(element("span", "activity-bar"));
-      working.append(spinner, element("span", "working-label", "Working"));
+      spinner.append(activityPulse());
+      const label = element("span", "working-label");
+      for (const [index, letter] of Array.from("Working").entries()) {
+        const glyph = element("span", "working-glyph", letter);
+        glyph.style.setProperty("--glyph-index", String(index));
+        label.append(glyph);
+      }
+      working.append(spinner, label);
       activity.append(working);
     }
   } else if (state.compaction.result?.summary) {

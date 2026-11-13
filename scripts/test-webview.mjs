@@ -722,14 +722,14 @@ try {
   const workingNode = await working.elementHandle();
   const spinnerFrame = () =>
     page
-      .locator(".working-spinner .activity-bar")
-      .first()
-      .evaluate((node) => getComputedStyle(node).transform);
+      .locator(".working-spinner .activity-sweep")
+      .evaluate((node) => getComputedStyle(node).strokeDashoffset);
   const firstFrame = await spinnerFrame();
   await page.waitForFunction(
     (first) =>
-      getComputedStyle(document.querySelector(".working-spinner .activity-bar"))
-        .transform !== first,
+      getComputedStyle(
+        document.querySelector(".working-spinner .activity-sweep"),
+      ).strokeDashoffset !== first,
     firstFrame,
   );
   await page.evaluate(() =>
@@ -741,28 +741,27 @@ try {
     ),
     "Streaming updates should preserve the active spinner",
   );
+  const glyphStyle = (property) =>
+    working
+      .locator(".working-label .working-glyph")
+      .first()
+      .evaluate((node, name) => getComputedStyle(node)[name], property);
   assert.equal(
-    await working
-      .locator(".working-label")
-      .evaluate((node) => getComputedStyle(node).animationName),
-    "working-shimmer",
+    await working.locator(".working-label .working-glyph").count(),
+    "Working".length,
+    "Each letter should animate on its own",
   );
-  assert.equal(await working.locator(".activity-bar").count(), 3);
+  assert.equal(await glyphStyle("animationName"), "working-wave");
+  assert.equal(await working.locator("svg.activity-pulse").count(), 1);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  assert.deepEqual(
-    await working
-      .locator(".activity-bar")
-      .evaluateAll((nodes) =>
-        nodes.map((node) => getComputedStyle(node).animationName),
-      ),
-    ["none", "none", "none"],
-  );
   assert.equal(
     await working
-      .locator(".working-label")
-      .evaluate((node) => getComputedStyle(node).animationName),
+      .locator(".activity-sweep")
+      .evaluate((node) => getComputedStyle(node).display),
     "none",
   );
+  assert.equal(await glyphStyle("animationName"), "none");
+  assert.equal(await glyphStyle("textShadow"), "none");
   assert.equal(
     await working
       .locator(".working-label")
@@ -776,12 +775,8 @@ try {
     reducedMotion: "no-preference",
     forcedColors: "active",
   });
-  assert.equal(
-    await working
-      .locator(".working-label")
-      .evaluate((node) => getComputedStyle(node).backgroundImage),
-    "none",
-  );
+  assert.equal(await glyphStyle("animationName"), "none");
+  assert.equal(await glyphStyle("textShadow"), "none");
   assert.equal(
     await working
       .locator(".working-label")
@@ -1099,13 +1094,12 @@ try {
           false,
         );
         const icon = execution.locator(".execution-icon");
-        assert.equal(await icon.locator(".activity-bar").count(), 3);
+        assert.equal(await icon.locator("svg.activity-pulse").count(), 1);
         assert.equal(
           await icon
-            .locator(".activity-bar")
-            .first()
+            .locator(".activity-sweep")
             .evaluate((node) => getComputedStyle(node).animationName),
-          "activity-flow",
+          "activity-heartbeat",
         );
         assert.equal(
           await executionSummary.evaluate(
@@ -1123,8 +1117,7 @@ try {
         await page.emulateMedia({ reducedMotion: "reduce" });
         assert.equal(
           await icon
-            .locator(".activity-bar")
-            .first()
+            .locator(".activity-sweep")
             .evaluate((node) => getComputedStyle(node).animationName),
           "none",
         );
@@ -1204,6 +1197,24 @@ try {
         assert.equal(await livePreview.isVisible(), true);
         assert.equal(await livePreview.locator("script").count(), 0);
         assert.ok((await livePreview.textContent()).length <= 600);
+        // The pulse icon belongs to the heading line, not to the middle of the
+        // heading plus preview block.
+        const iconAlign = await liveSummary.evaluate((node) => {
+          const icon = node.querySelector(".execution-icon");
+          const label = node.querySelector(".execution-label");
+          const iconBox = icon.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(label);
+          const firstLine = range.getClientRects()[0];
+          return {
+            iconCenter: iconBox.top + iconBox.height / 2,
+            firstLineCenter: firstLine.top + firstLine.height / 2,
+          };
+        });
+        assert.ok(
+          Math.abs(iconAlign.iconCenter - iconAlign.firstLineCenter) <= 2,
+          `Execution icon must sit on the heading line: ${theme} ${width} ${zoom} ${JSON.stringify(iconAlign)}`,
+        );
         const previewLayout = await livePreview.evaluate((node) => ({
           height: node.getBoundingClientRect().height,
           lineHeight: parseFloat(getComputedStyle(node).lineHeight),
@@ -1423,10 +1434,11 @@ try {
         const workingLabel = page.locator("#activity .working-label");
         assert.equal(await workingLabel.isVisible(), true);
         assert.equal(
-          await workingLabel.evaluate(
-            (node) => getComputedStyle(node).animationName,
-          ),
-          theme === "contrast" ? "none" : "working-shimmer",
+          await workingLabel
+            .locator(".working-glyph")
+            .first()
+            .evaluate((node) => getComputedStyle(node).animationName),
+          theme === "contrast" ? "none" : "working-wave",
         );
         await page.locator("#activity").screenshot({
           path: join(artifacts, `working-${theme}-${width}-${zoom}.png`),

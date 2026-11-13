@@ -514,7 +514,7 @@ main {
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) 10px;
+  grid-template-columns: 28px minmax(0, 1fr) 10px;
   gap: 9px;
   overflow: hidden;
   padding: 10px 11px;
@@ -538,12 +538,13 @@ main {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
+  align-self: start;
+  width: 28px;
+  height: 18px;
+  /* 展开预览时仍与标题行对齐，而不是在整块内容中居中 */
+  margin-top: 1px;
+  margin-top: calc((1lh - 18px) / 2);
   color: var(--pi-accent);
-  background: color-mix(in srgb, var(--pi-accent) 9%, transparent);
 }
 .execution-heading {
   min-width: 0;
@@ -616,8 +617,10 @@ main {
   outline-offset: 2px;
 }
 .execution-chevron {
+  align-self: start;
   width: 6px;
   height: 6px;
+  margin-top: calc((1lh - 6px) / 2);
   border-right: 1px solid var(--pi-accent);
   border-bottom: 1px solid var(--pi-accent);
   transform: rotate(-45deg);
@@ -938,101 +941,111 @@ input[type="checkbox"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  flex: 0 0 14px;
-  width: 14px;
-  height: 14px;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 18px;
   color: var(--pi-accent);
 }
-.activity-bar {
-  flex: 0 0 2px;
-  width: 2px;
-  height: 12px;
-  border-radius: 2px;
-  background: currentColor;
+.activity-pulse {
+  display: block;
+  width: 28px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.activity-trace {
   opacity: 0.85;
 }
-.working-spinner .activity-bar,
-.execution.is-running .activity-bar {
-  animation: activity-flow 1.4s ease-in-out var(--activity-delay) infinite;
+.activity-sweep {
+  display: none;
 }
-.activity-bar:nth-child(1) {
-  height: 7px;
-  --activity-delay: -0.9s;
+.working-spinner .activity-trace,
+.execution.is-running .activity-trace {
+  opacity: 0.3;
 }
-.activity-bar:nth-child(2) {
-  --activity-delay: -0.7s;
-}
-.activity-bar:nth-child(3) {
-  height: 9px;
-  --activity-delay: -0.5s;
+.working-spinner .activity-sweep,
+.execution.is-running .activity-sweep {
+  display: block;
+  stroke-dasharray: 18 100;
+  animation: activity-heartbeat 2.2s linear infinite;
 }
 .working-label {
+  display: inline-block;
   color: var(--pi-accent);
   font-weight: 500;
-  letter-spacing: 0.025em;
-  background: linear-gradient(
-    105deg,
-    var(--pi-muted) 0%,
-    var(--pi-muted) 35%,
-    var(--pi-accent) 48%,
-    var(--pi-fg) 52%,
-    var(--pi-muted) 65%,
-    var(--pi-muted) 100%
-  );
-  background-size: 260% 100%;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: working-shimmer 3.6s ease-in-out infinite;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
-@keyframes activity-flow {
-  0%,
-  100% {
-    transform: scaleY(0.45);
-    opacity: 0.5;
+.working-glyph {
+  display: inline-block;
+  animation: working-wave 2.2s linear infinite both;
+  animation-delay: calc(var(--glyph-index, 0) * 0.315s - 2.2s);
+}
+@keyframes activity-heartbeat {
+  from {
+    stroke-dashoffset: 18;
   }
-  50% {
-    transform: scaleY(1);
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+@keyframes working-wave {
+  0% {
     opacity: 1;
+    transform: translateY(-1.5px);
+    text-shadow: 0 0 9px color-mix(in srgb, var(--pi-accent) 72%, transparent);
   }
-}
-@keyframes working-shimmer {
-  0%,
-  15% {
-    background-position: 100% 50%;
-  }
-  85%,
+  22%,
   100% {
-    background-position: 0% 50%;
+    opacity: 0.68;
+    transform: translateY(0);
+    text-shadow: 0 0 0 transparent;
   }
 }
 .vscode-high-contrast .working-label,
 .vscode-high-contrast-light .working-label {
-  background: none;
   color: var(--pi-fg);
-  -webkit-text-fill-color: currentColor;
+}
+.vscode-high-contrast .working-glyph,
+.vscode-high-contrast-light .working-glyph {
+  opacity: 1;
+  text-shadow: none;
+  transform: none;
   animation: none;
 }
 @media (forced-colors: active) {
   .working-label {
-    background: none;
     color: CanvasText;
-    -webkit-text-fill-color: currentColor;
+  }
+  .working-glyph {
+    opacity: 1;
+    text-shadow: none;
+    transform: none;
     animation: none;
   }
-  .activity-bar {
-    background: CanvasText;
+  .activity-pulse {
+    stroke: CanvasText;
     forced-color-adjust: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .working-spinner .activity-bar,
-  .working-label {
+  .working-spinner .activity-sweep,
+  .execution.is-running .activity-sweep {
+    display: none;
     animation: none;
   }
-  .working-label {
-    background: none;
-    -webkit-text-fill-color: currentColor;
+  .working-spinner .activity-trace,
+  .execution.is-running .activity-trace {
+    opacity: 0.85;
+  }
+  .working-glyph {
+    opacity: 1;
+    text-shadow: none;
+    transform: none;
+    animation: none;
   }
 }
 #queue {

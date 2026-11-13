@@ -60,6 +60,22 @@ export function element<K extends keyof HTMLElementTagNameMap>(
   if (text !== undefined) node.textContent = text;
   return node;
 }
+export function activityPulse(): SVGSVGElement {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.classList.add("activity-pulse");
+  svg.setAttribute("viewBox", "0 0 28 18");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  for (const className of ["activity-trace", "activity-sweep"]) {
+    const path = document.createElementNS(ns, "path");
+    path.classList.add(className);
+    path.setAttribute("d", "M1 9H6L8 6L11 13L14 2L18 16L21 9H27");
+    path.setAttribute("pathLength", "100");
+    svg.append(path);
+  }
+  return svg;
+}
 interface CachedNode {
   signature: string;
   node: HTMLElement;
@@ -214,8 +230,7 @@ export function renderChat(
         summary.title = "展开或收起完整执行过程；运行预览最多显示三行";
         const icon = element("span", "execution-icon");
         icon.setAttribute("aria-hidden", "true");
-        for (let index = 0; index < 3; index++)
-          icon.append(element("span", "activity-bar"));
+        icon.append(activityPulse());
         const heading = element("span", "execution-heading");
         const labels = element("span", "execution-labels");
         const label = element("span", "execution-label");
