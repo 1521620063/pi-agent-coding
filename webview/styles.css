@@ -480,18 +480,101 @@ main {
   border-left: 1px solid var(--pi-line);
   line-height: 1.6;
 }
+.execution {
+  min-width: 0;
+  margin: -8px 0 20px;
+  color: var(--pi-muted);
+  font-size: var(--pi-font-small);
+}
+.execution > summary,
+.tool > summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  list-style: none;
+  cursor: pointer;
+  min-width: 0;
+}
+.execution > summary::-webkit-details-marker,
+.tool > summary::-webkit-details-marker {
+  display: none;
+}
+.execution > summary::before,
+.tool > summary::before {
+  content: "›";
+  flex: 0 0 10px;
+  text-align: center;
+  font-family: var(--vscode-font-family, system-ui);
+  color: var(--pi-muted);
+}
+.execution[open] > summary::before,
+.tool[open] > summary::before {
+  transform: rotate(90deg);
+}
+.execution > summary {
+  padding: 6px 0;
+  border-radius: 3px;
+}
+.execution > summary:hover {
+  color: var(--pi-fg);
+}
+.execution.is-running > summary {
+  color: var(--pi-fg);
+}
+.execution.has-error > summary {
+  color: var(--pi-tool-error);
+}
+.execution-body {
+  margin: 5px 0 0 5px;
+  padding-left: 12px;
+  border-left: 1px solid var(--pi-line);
+}
+.execution-body > .assistant-message {
+  margin: 0 0 8px;
+}
+.execution-body > .assistant-message > .markdown {
+  color: var(--pi-muted);
+  font-size: var(--pi-font-small);
+}
+.execution-body > .assistant-message > .content-actions {
+  display: none;
+}
 .tool {
+  min-width: 0;
   padding: 0;
-  margin: 6px 0;
-  border: 1px solid var(--pi-line);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--pi-fg) 2%, var(--pi-bg));
+  margin: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 .tool > summary {
-  padding: 8px 11px;
+  padding: 5px 0;
   line-height: 1.5;
-  font-family: var(--vscode-editor-font-family, monospace);
   font-size: var(--pi-font-small);
+  font-family: inherit;
+}
+.tool-action {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-status {
+  flex-shrink: 0;
+  color: var(--pi-muted);
+}
+.tool.error .tool-status {
+  color: var(--pi-tool-error);
+}
+.tool-target {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pi-muted);
+  font-family: var(--vscode-editor-font-family, monospace);
 }
 .tool.success > summary {
   color: var(--pi-fg);

@@ -854,6 +854,164 @@ try {
         );
         if (theme !== "contrast")
           assert.equal(palette.selectionText, expectedAccent);
+        // A real browser verifies native disclosure behavior and compact tool rows.
+        await page.evaluate(() => {
+          const tools = Array.from({ length: 7 }, (_, index) => ({
+            id: `process-${index}`,
+            name:
+              index === 4
+                ? "mcp__provider__" + "long_tool_name_".repeat(20)
+                : index % 2
+                  ? "bash"
+                  : "read",
+            args:
+              index % 2
+                ? {
+                    command:
+                      "npm run check && npm test -- --reporter=verbose " +
+                      "long-argument ".repeat(30),
+                  }
+                : { path: `src/features/example-${index}.ts` },
+            status: index === 6 ? "error" : "success",
+            result: {
+              content: [
+                {
+                  type: "text",
+                  text: index === 6 ? "示例错误：文件不存在" : "示例工具输出",
+                },
+              ],
+            },
+          }));
+          window.processFixture = {
+            ...window.fixtureState,
+            run: "idle",
+            messages: [
+              { role: "user", content: "看看这个项目" },
+              { role: "assistant", content: "我先阅读项目文件，再检查构建。" },
+              ...tools.map((tool) => ({
+                role: "assistant",
+                content: [{ type: "toolCall", id: tool.id, name: tool.name }],
+              })),
+              {
+                role: "assistant",
+                content:
+                  "项目结构已经梳理完成。你可以展开执行过程查看命令和错误详情。",
+              },
+            ],
+            tools,
+          };
+          window.deliver({ type: "snapshot", state: window.processFixture });
+        });
+        const execution = page.locator(".execution");
+        const executionSummary = execution.locator(":scope > summary");
+        assert.equal(await execution.count(), 1);
+        assert.match(
+          await executionSummary.textContent(),
+          /7 项操作 · 1 项失败/,
+        );
+        assert.equal(await execution.evaluate((node) => node.open), false);
+        assert.equal(await page.locator(".tool").first().isVisible(), false);
+        assert.equal(
+          await page
+            .locator("#transcript > .assistant-message .markdown")
+            .isVisible(),
+          true,
+        );
+        await executionSummary.scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: join(
+            artifacts,
+            `process-collapsed-${theme}-${width}-${zoom}.png`,
+          ),
+          fullPage: true,
+        });
+        await executionSummary.focus();
+        await page.keyboard.press("Enter");
+        assert.equal(await execution.evaluate((node) => node.open), true);
+        const commandSummary = page
+          .locator(".tool")
+          .nth(1)
+          .locator(":scope > summary");
+        await commandSummary.scrollIntoViewIfNeeded();
+        const commandLayout = await commandSummary.evaluate((node) => {
+          const target = node.querySelector(".tool-target");
+          return {
+            height: node.getBoundingClientRect().height,
+            lineHeight:
+              parseFloat(getComputedStyle(node).lineHeight) *
+              parseFloat(document.body.style.zoom || "1"),
+            truncated: target.scrollWidth > target.clientWidth,
+          };
+        });
+        assert.ok(
+          commandLayout.truncated,
+          "Long commands must be visually truncated",
+        );
+        assert.ok(
+          commandLayout.height < commandLayout.lineHeight + 20 * zoom,
+          "Tool headers must stay on one line",
+        );
+        await commandSummary.focus();
+        await page.keyboard.press("Space");
+        assert.equal(
+          await page
+            .locator(".tool")
+            .nth(1)
+            .evaluate((node) => node.open),
+          true,
+        );
+        assert.equal(
+          await page
+            .locator(".tool")
+            .nth(1)
+            .locator(".tool-output")
+            .isVisible(),
+          true,
+        );
+        assert.equal(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth > window.innerWidth + 1,
+          ),
+          false,
+          `Process overflow: ${theme} ${width} ${zoom}`,
+        );
+        await executionSummary.scrollIntoViewIfNeeded();
+        await page.screenshot({
+          path: join(
+            artifacts,
+            `process-expanded-${theme}-${width}-${zoom}.png`,
+          ),
+          fullPage: true,
+        });
+        await page.evaluate(() => {
+          window.deliver({
+            type: "snapshot",
+            state: {
+              ...window.processFixture,
+              run: "running",
+              tools: window.processFixture.tools.map((tool, index) =>
+                index === 6
+                  ? { ...tool, status: "pending", result: undefined }
+                  : tool,
+              ),
+            },
+          });
+        });
+        assert.match(await executionSummary.textContent(), /正在执行/);
+        assert.equal(await execution.evaluate((node) => node.open), true);
+        assert.equal(
+          await page
+            .locator(".tool")
+            .nth(1)
+            .evaluate((node) => node.open),
+          true,
+        );
+        await executionSummary.focus();
+        await page.keyboard.press("Enter");
+        assert.equal(await execution.evaluate((node) => node.open), false);
+        await page.evaluate(() =>
+          window.deliver({ type: "snapshot", state: window.fixtureState }),
+        );
         await page.screenshot({
           path: join(artifacts, `${theme}-${width}-${zoom}.png`),
           fullPage: true,

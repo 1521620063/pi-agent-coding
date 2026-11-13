@@ -16,6 +16,7 @@ function fixture() {
         { type: "text", text: "earlier answer" },
       ],
     },
+    { role: "user", content: "current question" },
     {
       role: "assistant",
       content: [
@@ -44,7 +45,7 @@ it("retains historical nodes, focus, selection and expanded thinking across clon
   selection.removeAllRanges();
   selection.addRange(range);
   const next = structuredClone(state);
-  next.messages[2].content = [
+  next.messages[3].content = [
     { type: "text", text: "streaming" },
     { type: "toolCall", id: "tool", name: "custom" },
   ];
@@ -58,7 +59,7 @@ it("retains historical nodes, focus, selection and expanded thinking across clon
 
 it("updates tool output without replacing its assistant text or closed/open state", () => {
   const { state, container } = fixture();
-  const assistant = container.children[2];
+  const assistant = container.querySelector(".execution .assistant-message")!;
   const markdown = assistant.querySelector(".markdown");
   const tool = assistant.querySelector("details")!;
   tool.open = true;
@@ -68,7 +69,9 @@ it("updates tool output without replacing its assistant text or closed/open stat
     result: { content: [{ type: "text", text: "finished" }] },
   };
   renderChat(container, structuredClone(state));
-  expect(container.children[2] === assistant).toBe(true);
+  expect(
+    container.querySelector(".execution .assistant-message") === assistant,
+  ).toBe(true);
   expect(assistant.querySelector(".markdown") === markdown).toBe(true);
   expect(assistant.querySelector("details") === tool).toBe(true);
   expect(tool.open).toBe(true);
@@ -108,7 +111,7 @@ it("keeps matching nodes during search and invalidates nodes on session changes"
 
 it("uses authoritative snapshots after truncation, disconnection and message replacement", () => {
   const { state, container } = fixture();
-  state.messages[2] = { role: "assistant", content: "authoritative" };
+  state.messages[3] = { role: "assistant", content: "authoritative" };
   state.tools = [];
   renderChat(container, structuredClone(state));
   expect(container.textContent).toContain("authoritative");

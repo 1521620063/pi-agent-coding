@@ -64,10 +64,16 @@ interface CachedNode {
   signature: string;
   node: HTMLElement;
 }
+interface ActivityNode {
+  node: HTMLDetailsElement;
+  summary: HTMLElement;
+  body: HTMLElement;
+}
 interface ChatCache {
   context: string;
   messages: Map<number, CachedNode>;
   tools: Map<string, CachedNode>;
+  activities: Map<number, ActivityNode>;
   empty?: HTMLElement;
   noMatches?: HTMLElement;
 }
@@ -88,6 +94,38 @@ function reconcileChildren(parent: HTMLElement, children: HTMLElement[]) {
   }
 }
 
+// Keep commentary and tool calls together, leaving the response after the last
+// operation visible. User/custom messages are boundaries; tool results are not.
+function activityMembership(messages: AgentMessage[]) {
+  const membership = new Map<number, number>();
+  let start = 0;
+  let lastOperation = -1;
+  const flush = () => {
+    for (let index = start; index <= lastOperation; index++)
+      if (messages[index].role === "assistant") membership.set(index, start);
+    lastOperation = -1;
+  };
+  for (const [index, message] of messages.entries()) {
+    if (message.role === "toolResult") continue;
+    if (message.role !== "assistant") {
+      flush();
+      start = index + 1;
+    } else if (
+      Array.isArray(message.content) &&
+      (message.content.some((block) => block?.type === "toolCall") ||
+        (message.content.some((block) => block?.type === "thinking") &&
+          !message.content.some(
+            (block) =>
+              block?.type === "image" ||
+              (block?.type === "text" && String(block.text ?? "").trim()),
+          )))
+    )
+      lastOperation = index;
+  }
+  flush();
+  return membership;
+}
+
 export function renderChat(
   container: HTMLElement,
   state: ViewState,
@@ -102,10 +140,16 @@ export function renderChat(
   ]);
   let cache = chats.get(container);
   if (!cache || cache.context !== context) {
-    cache = { context, messages: new Map(), tools: new Map() };
+    cache = {
+      context,
+      messages: new Map(),
+      tools: new Map(),
+      activities: new Map(),
+    };
     chats.set(container, cache);
   }
   const tools = new Map<string, HTMLElement>();
+  const toolRecords = new Map(state.tools.map((tool) => [tool.id, tool]));
   for (const tool of state.tools) {
     const signature = JSON.stringify(tool);
     let cached = cache.tools.get(tool.id);
@@ -129,6 +173,36 @@ export function renderChat(
     )
       cache.messages.delete(index);
   const children: HTMLElement[] = [];
+  const membership = query
+    ? new Map<number, number>()
+    : activityMembership(state.messages);
+  const activities = new Map<
+    number,
+    { children: HTMLElement[]; tools: Set<string> }
+  >();
+  const appendActivity = (
+    key: number,
+    node: HTMLElement,
+    toolIds: string[],
+  ) => {
+    let activity = activities.get(key);
+    if (!activity) {
+      activity = { children: [], tools: new Set() };
+      activities.set(key, activity);
+      let cached = cache.activities.get(key);
+      if (!cached) {
+        const details = element("details", "execution");
+        const summary = element("summary", "execution-summary");
+        const body = element("div", "execution-body");
+        details.append(summary, body);
+        cached = { node: details, summary, body };
+        cache.activities.set(key, cached);
+      }
+      children.push(cached.node);
+    }
+    activity.children.push(node);
+    for (const id of toolIds) activity.tools.add(id);
+  };
   const shown = new Set<string>();
   const normalizedQuery = query.toLocaleLowerCase();
   for (const [index, message] of state.messages.entries()) {
@@ -200,10 +274,46 @@ export function renderChat(
     if (edit && edit.disabled !== (state.connection !== "connected"))
       edit.disabled = state.connection !== "connected";
     for (const id of toolIds) shown.add(id);
-    children.push(cached.node);
+    const activityKey = membership.get(index);
+    if (activityKey === undefined) children.push(cached.node);
+    else appendActivity(activityKey, cached.node, toolIds);
   }
+  let lastUser = -1;
+  for (const [index, message] of state.messages.entries())
+    if (message.role === "user") lastUser = index;
   for (const tool of state.tools)
-    if (!query && !shown.has(tool.id)) children.push(tools.get(tool.id)!);
+    if (!query && !shown.has(tool.id)) {
+      const key =
+        [...activities.keys()].reverse().find((index) => index > lastUser) ??
+        lastUser + 1;
+      appendActivity(key, tools.get(tool.id)!, [tool.id]);
+    }
+  for (const [key, activity] of activities) {
+    const cached = cache.activities.get(key)!;
+    const records = [...activity.tools].map((id) => toolRecords.get(id)!);
+    const pending = records.filter((tool) => tool.status === "pending");
+    const errors = records.filter((tool) => tool.status === "error").length;
+    const interrupted = pending.length > 0 && state.connection !== "connected";
+    const label = interrupted
+      ? "执行已中断"
+      : pending.length
+        ? "正在执行"
+        : "执行过程";
+    const count = records.length ? ` · ${records.length} 项操作` : "";
+    const failure = errors ? ` · ${errors} 项失败` : "";
+    const current = pending.length
+      ? ` · ${toolDescription(pending.at(-1)!).action}`
+      : "";
+    const summary = `${label}${count}${failure}${current}`;
+    if (cached.summary.textContent !== summary)
+      cached.summary.textContent = summary;
+    const className = `execution${errors || interrupted ? " has-error" : ""}${pending.length && !interrupted ? " is-running" : ""}`;
+    if (cached.node.className !== className) cached.node.className = className;
+    reconcileChildren(cached.body, activity.children);
+  }
+  // Retain collapsed/open state across filtering, but discard obsolete turns.
+  for (const key of cache.activities.keys())
+    if (!query && !activities.has(key)) cache.activities.delete(key);
   if (query && !children.length) {
     cache.noMatches ??= element(
       "p",
@@ -290,14 +400,42 @@ function appendImage(node: HTMLElement, block: JsonObject) {
   image.src = `data:${block.mimeType};base64,${block.data}`;
   node.append(image);
 }
+function toolDescription(tool: ToolView) {
+  const actions: Record<string, string> = {
+    read: "读取文件",
+    write: "写入文件",
+    edit: "编辑文件",
+    bash: "运行命令",
+    grep: "搜索内容",
+    find: "查找文件",
+    ls: "查看目录",
+  };
+  return {
+    action: Object.hasOwn(actions, tool.name) ? actions[tool.name] : tool.name,
+    target: String(
+      tool.args.path ?? tool.args.command ?? tool.args.pattern ?? "",
+    )
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 140),
+  };
+}
 export function renderTool(tool: ToolView) {
   const details = element("details", `tool ${tool.status}`);
   details.dataset.key = `tool-${tool.id}`;
   const marker =
     tool.status === "pending" ? "·" : tool.status === "success" ? "✓" : "×";
-  const label = `${marker} ${tool.name}  ${String(tool.args.path ?? tool.args.command ?? "").slice(0, 140)}`;
+  const { action, target } = toolDescription(tool);
+  const summary = element("summary");
+  const status = element("span", "tool-status", marker);
+  status.setAttribute(
+    "aria-label",
+    { pending: "执行中", success: "成功", error: "失败" }[tool.status],
+  );
+  summary.append(status, element("span", "tool-action", action));
+  if (target) summary.append(element("span", "tool-target", target));
   details.append(
-    element("summary", "", label),
+    summary,
     element("pre", "tool-args", JSON.stringify(tool.args, null, 2)),
   );
   if (typeof tool.args.path === "string") {
