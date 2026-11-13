@@ -348,13 +348,27 @@ wa-dropdown-item[checkbox-adjacent] {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   font-size: var(--pi-font-compact);
-  padding: 0 3px 8px;
+  padding: 0 3px 6px;
 }
 #stop::part(base) {
-  min-height: 26px;
+  min-height: 22px;
+  gap: 5px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
   font-size: var(--pi-font-compact);
-  padding: 0 8px;
+  color: var(--pi-muted);
+}
+#stop::part(base):hover {
+  background: var(--pi-hover);
+  color: var(--pi-fg);
+}
+#stop wa-icon {
+  font-size: 0.85em;
+  opacity: 0.75;
 }
 #shell-panel {
   font-size: var(--pi-font-small);

@@ -61,7 +61,7 @@ export const sidebarMarkup = `
 <main id="transcript" aria-label="PI 对话" tabindex="0"></main>
 <section id="activity" aria-live="polite"></section><div id="widgets-above"></div><section id="queue" hidden></section>
 <footer>
-  <div id="run-controls" hidden><span class="muted">当前任务</span><wa-button data-action="stop" id="stop" size="s" appearance="outlined" variant="danger">停止全部</wa-button></div>
+  <div id="run-controls" hidden><span class="muted">当前任务</span><wa-button data-action="stop" id="stop" size="s" appearance="plain" variant="neutral" title="先清空队列，再中止当前任务"><wa-icon name="xmark"></wa-icon>停止全部</wa-button></div>
   <div class="composer">
     <div id="attachments"></div><div id="command-menu" role="listbox" aria-label="输入补全" hidden></div>
     <wa-textarea id="prompt" rows="3" resize="auto" size="s" aria-label="发送给 PI" aria-controls="command-menu" aria-expanded="false" placeholder="有什么想一起完成的？@ 添加文件，/ 选择命令"></wa-textarea>
