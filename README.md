@@ -6,7 +6,7 @@
 
 当前版本为 **1.0.4（正式版）**，扩展标识为 `SilasPaul.pi-agent-coding`。PI 协议验证基线为 **1.5.2**，兼容目标为 **Windows 与 macOS 本地环境**；首次上架完成前可通过 VSIX 安装。具体变更见 [更新记录](CHANGELOG.md)。
 
-验收范围：Windows 保留既有本地验证基线；本轮在 macOS 验证了自动发现、真实 PI RPC 握手、模拟进程清理和原生 VS Code 扩展宿主，新增 Windows / macOS CI 尚待远端运行；真实模型生成、真实 MCP / 扩展交互和长会话成功压缩尚未完成端到端验收。模拟进程、浏览器夹具和扩展宿主测试不代表这些真实环境已经通过。完整说明见“范围与限制”。
+验收范围：Windows 保留既有本地验证基线；本轮在 macOS 验证了自动发现、真实 PI RPC 握手、模拟进程清理和原生 VS Code 扩展宿主，跨平台 CI 尚未配置；真实模型生成、真实 MCP / 扩展交互和长会话成功压缩尚未完成端到端验收。模拟进程、浏览器夹具和扩展宿主测试不代表这些真实环境已经通过。完整说明见“范围与限制”。
 
 ## 界面
 
@@ -137,7 +137,9 @@ code --install-extension .\pi-agent-coding-1.0.4.vsix
 
 Windows 官方 `.ps1` / `.cmd` 启动器、npm shim 与 macOS npm 符号链接会解析到对应 JS 入口。macOS 官方托管安装器按 `current-version` 读取当前 PI 入口，每次重连重新解析，避免固定到旧版本；插件不执行任意自定义 shell 包装脚本。
 
-自动发现优先使用显式设置，其次使用 VS Code 继承的 `PATH`，然后检查常见安装位置：用户 `.local/bin`、PI 托管目录、Windows 用户 npm 目录与 Node.js 安装目录，以及 macOS 的 Apple Silicon / Intel Homebrew 路径。也识别 Volta、nvm 的默认版本、fnm 默认别名和已提供的 npm prefix 等位置；未覆盖的自定义布局仍需手动设置。发现的 Node 与安装目录会加入本次 PI 子进程的 PATH，不改写系统或 shell 配置。
+自动发现优先使用显式设置，其次使用 VS Code 继承的 `PATH`。缺少 PATH 时，配置的 `pi.nodePath` 所在目录也可用于查找 PI；已找到 PI 时，会在启动器及其符号链接目标所在目录查找 Node.js，然后检查环境变量指定的安装位置和常见目录。支持自定义 `VOLTA_HOME`、npm prefix、Windows `NVM_SYMLINK` 与 POSIX `NVM_BIN`，也检查用户 `.local/bin`、PI 托管目录、Windows 用户 npm 与系统 Node.js / Volta 目录，以及 macOS 的 Apple Silicon / Intel Homebrew 路径；POSIX 另识别 nvm 默认版本与 fnm 默认别名。路径按所在平台规则解析，不依赖固定用户名或盘符；未覆盖的自定义布局仍需手动配置 `pi.executablePath` 和 `pi.nodePath`。发现的 Node 与安装目录会加入本次 PI 子进程的 PATH，不改写系统或 shell 配置。
+
+Windows 自动发现按大小写不敏感的规则读取环境变量（例如 `ProgramFiles` / `PROGRAMFILES`），并优先使用 `USERPROFILE` 定位用户 PI 目录，避免 Git Bash 的 `HOME` 指向其他位置时漏掉原生安装。除用户 Volta 目录外，也检查 `Program Files\Volta` 中的 Node.js。环境中同时存在 `PATH` / `Path` 时，沿用 Node.js 的 Windows 优先级，向 PI 子进程只传递一个 PATH 变量。
 
 macOS 如果从 Dock 启动 VS Code 后提示找不到 PI，请先在终端运行 `command -v pi` 和 `command -v node` 核对安装。必要时将 PI 官方 JS 入口与 Node 的绝对路径分别填入 `pi.executablePath`、`pi.nodePath`。找不到 PI、找不到 Node、无法识别启动器和文件不可执行会分别提示；版本检测失败会附带有界 stderr 诊断。更改设置后，通过 **PI: Reconnect** 或侧栏重新连接使其生效。
 
@@ -298,6 +300,10 @@ npm run compile
 
 ### Windows / macOS 兼容性验证
 
-新增 `.github/workflows/compatibility.yml`，在 Windows 与 macOS runner 上执行类型检查、单元测试、进程集成测试、构建及扩展宿主测试。本地通过不代表远端矩阵已通过；以实际 CI 结果为准。两平台均覆盖含空格和中文路径、stdin EOF、启动取消、协议损坏与强制清理子进程；macOS 使用插件独占的进程组，Windows 使用当前 PID 的 `taskkill /T`。
+当前仓库尚未包含 Windows / macOS CI 工作流，需分别执行类型检查、单元测试、进程集成测试、构建及扩展宿主测试；本地通过不代表另一平台已经通过。两平台的现有用例覆盖含空格和中文路径、stdin EOF、启动取消、协议损坏与强制清理子进程；macOS 使用插件独占的进程组，Windows 使用当前 PID 的 `taskkill /T`。
 
 本轮 macOS 实测：PI 1.5.2 在移除用户 PATH 且不配置入口的情况下自动发现并完成 `get_state` 握手；未发送模型请求。UI 样式未改动，未重新执行完整主题、缩放和响应式截图矩阵。
+
+自动发现回归用例使用临时目录和独立环境变量，覆盖自定义 PI / Node 路径、便携目录、自定义 Volta / npm / nvm 位置及配置优先级；目录生成用例还覆盖多个 Windows 盘符与 POSIX 路径规则。这些模拟用例不等同于在所有操作系统、Node.js 管理器和自定义安装布局上的实机验证。
+
+本轮 Windows 补充实测：在含空格和中文的专用临时目录中，移除继承的 PATH 后自动发现官方 PI 启动器和系统 Volta，完成 PI 1.5.2 版本检测与 `get_state` 握手。独立测试环境清除了上游代理进程携带的 Volta 内部递归标记；关闭扩展、技能与模板发现，使用离线模式且不保存会话，未发送模型请求或修改用户配置。

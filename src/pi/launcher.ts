@@ -14,7 +14,9 @@ import {
   extname,
   isAbsolute,
   join,
+  posix,
   resolve,
+  win32,
 } from "node:path";
 import { fileURLToPath } from "node:url";
 export interface LaunchSpec {
@@ -102,20 +104,41 @@ export function installationDirectories(
   env: NodeJS.ProcessEnv,
   platform = process.platform,
 ): string[] {
-  const home = env.HOME || env.USERPROFILE || homedir();
+  // Use the requested platform's path rules, including when validating another
+  // platform's discovery rules in tests.
+  const { join } = platform === "win32" ? win32 : posix;
+  const value = (name: string): string | undefined => {
+    if (platform !== "win32") return env[name];
+    const key = Object.keys(env)
+      .sort()
+      .find((key) => key.toLowerCase() === name.toLowerCase());
+    return key === undefined ? undefined : env[key];
+  };
+  const home =
+    (platform === "win32"
+      ? value("USERPROFILE") || value("HOME")
+      : value("HOME") || value("USERPROFILE")) || homedir();
   const directories = [
     join(home, ".local", "bin"),
     join(home, ".pi", "agent", "bin"),
   ];
   if (platform === "win32") {
-    if (env.APPDATA) directories.push(join(env.APPDATA, "npm"));
-    if (env.LOCALAPPDATA)
+    const appData = value("APPDATA");
+    const localAppData = value("LOCALAPPDATA");
+    const programFiles = value("ProgramFiles");
+    const nvmSymlink = value("NVM_SYMLINK");
+    if (appData) directories.push(join(appData, "npm"));
+    if (localAppData)
       directories.push(
-        join(env.LOCALAPPDATA, "Volta", "bin"),
-        join(env.LOCALAPPDATA, "Programs", "nodejs"),
+        join(localAppData, "Volta", "bin"),
+        join(localAppData, "Programs", "nodejs"),
       );
-    if (env.ProgramFiles) directories.push(join(env.ProgramFiles, "nodejs"));
-    if (env.NVM_SYMLINK) directories.push(env.NVM_SYMLINK);
+    if (programFiles)
+      directories.push(
+        join(programFiles, "nodejs"),
+        join(programFiles, "Volta"),
+      );
+    if (nvmSymlink) directories.push(nvmSymlink);
   } else {
     if (env.NVM_BIN) directories.push(env.NVM_BIN);
     directories.push(
@@ -133,13 +156,11 @@ export function installationDirectories(
     if (platform === "darwin")
       directories.push("/opt/homebrew/bin", "/usr/local/bin");
   }
-  if (env.VOLTA_HOME) directories.unshift(join(env.VOLTA_HOME, "bin"));
-  if (env.npm_config_prefix)
-    directories.push(
-      platform === "win32"
-        ? env.npm_config_prefix
-        : join(env.npm_config_prefix, "bin"),
-    );
+  const voltaHome = value("VOLTA_HOME");
+  if (voltaHome) directories.unshift(join(voltaHome, "bin"));
+  const npmPrefix = value("npm_config_prefix");
+  if (npmPrefix)
+    directories.push(platform === "win32" ? npmPrefix : join(npmPrefix, "bin"));
   return directories;
 }
 async function nvmDirectories(env: NodeJS.ProcessEnv): Promise<string[]> {
@@ -178,18 +199,29 @@ export async function resolvePiLaunch(
   sourceEnv: NodeJS.ProcessEnv,
 ): Promise<LaunchSpec> {
   const env = { ...sourceEnv };
-  const pathKeys = Object.keys(env).filter(
-    (key) => key.toLowerCase() === "path",
+  const pathKeys = Object.keys(env).filter((key) =>
+    process.platform === "win32"
+      ? key.toLowerCase() === "path"
+      : key === "PATH",
   );
-  const pathKey = pathKeys.at(-1) ?? "PATH";
+  // Match Node's Windows spawn semantics when a plain object contains both
+  // PATH and Path: the first key in lexicographic order takes precedence.
+  const pathKey =
+    (process.platform === "win32" ? pathKeys.sort()[0] : pathKeys.at(-1)) ??
+    "PATH";
   for (const key of pathKeys) if (key !== pathKey) delete env[key];
   const inherited = (env[pathKey] ?? "")
     .split(delimiter)
     .filter(Boolean)
     .map((directory) => directory.replace(/^"|"$/g, ""));
+  if (config.nodePath && !isAbsolute(config.nodePath))
+    throw new Error("pi.nodePath 必须是 Node.js 可执行文件的绝对路径。");
+  if (config.nodePath && !(await exists(config.nodePath, true)))
+    throw new Error("配置的 Node.js 不存在或不可执行，请检查 pi.nodePath。");
   const directories = [
     ...new Set([
       ...inherited,
+      ...(config.nodePath ? [dirname(config.nodePath)] : []),
       ...installationDirectories(env),
       ...(await nvmDirectories(env)),
     ]),
@@ -250,16 +282,20 @@ export async function resolvePiLaunch(
         throw error;
     }
   }
-  if (config.nodePath && !isAbsolute(config.nodePath))
-    throw new Error("pi.nodePath 必须是 Node.js 可执行文件的绝对路径。");
+  const nodeDirectories = [
+    ...new Set([
+      ...inherited,
+      dirname(executable),
+      dirname(target),
+      ...directories,
+    ]),
+  ];
   const node =
     config.nodePath ||
     (await findIn(
-      directories,
+      nodeDirectories,
       process.platform === "win32" ? ["node.exe"] : ["node"],
     ));
-  if (config.nodePath && !(await exists(config.nodePath, true)))
-    throw new Error("配置的 Node.js 不存在或不可执行，请检查 pi.nodePath。");
   // Include fallback directories for tools started by PI as well as its shebang.
   env[pathKey] = [
     ...new Set([

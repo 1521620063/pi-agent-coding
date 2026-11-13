@@ -5,7 +5,9 @@
 - 补充 Windows / macOS 常见安装目录与 Node.js 自动发现，处理 VS Code 缺少 shell PATH 的情况。
 - 识别 macOS 官方托管安装与 npm 符号链接，每次连接重新解析当前 PI 版本；明确区分启动器、Node 与文件权限错误。
 - macOS 强制关闭使用独占进程组，补齐子进程清理；修复明确选择的文件经过真实路径解析后无法打开的问题。
-- 修正测试中的 Windows 路径假设，增加双平台 CI 与 macOS 本机 VS Code 检测。验证范围见 README。
+- 修正测试中的 Windows 路径假设，增加 macOS 本机 VS Code 检测。验证范围见 README。
+- 修复 Windows 环境变量大小写、`USERPROFILE` 优先级与 `PATH` / `Path` 重名处理，并补充系统 Volta 安装目录；POSIX 保持环境变量大小写敏感。
+- 通用发现支持从配置的 Node.js 路径查找相邻 PI、从 PI 启动器及其符号链接目标查找相邻 Node.js；补充便携安装、自定义 Volta / npm / nvm 位置、多盘符和平台路径规则回归用例。
 
 ## 1.0.4
 

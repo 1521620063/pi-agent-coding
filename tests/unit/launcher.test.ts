@@ -9,7 +9,7 @@ import {
   realpath,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join, posix, win32 } from "node:path";
 import {
   resolvePiLaunch,
   assertWorkspace,
@@ -29,7 +29,7 @@ it("finds a PI official launcher in a path containing spaces and Unicode", async
     await writeFile(join(dir, "pi-launcher.js"), "// official launcher");
     const launch = await resolvePiLaunch(
       { nodePath: process.execPath },
-      { ...process.env, PATH: dir },
+      { HOME: dir, USERPROFILE: dir, PATH: dir },
     );
     expect(process.platform === "win32" ? launch.args[0] : launch.command).toBe(
       join(dir, process.platform === "win32" ? "pi-launcher.js" : "pi"),
@@ -138,9 +138,10 @@ it.each([".cmd", ".ps1", ".bat"])(
       await writeFile(join(pkg, "dist", "cli.js"), "// fixture");
       const shim = join(dir, `pi${extension}`);
       await writeFile(shim, "arbitrary shell text must not execute");
+      const env = process.platform === "win32" ? { Path: dir } : { PATH: dir };
       const launch = await resolvePiLaunch(
         { executablePath: shim, nodePath: process.execPath },
-        { Path: dir },
+        env,
       );
       expect(launch.command).toBe(process.execPath);
       expect(launch.args).toEqual([
@@ -153,8 +154,9 @@ it.each([".cmd", ".ps1", ".bat"])(
           "cli.js",
         ),
       ]);
-      expect(launch.env.Path).toContain(dir);
-      expect(launch.env.PATH).toBeUndefined();
+      const pathKey = process.platform === "win32" ? "Path" : "PATH";
+      expect(launch.env[pathKey]).toContain(dir);
+      expect(launch.env[pathKey === "PATH" ? "Path" : "PATH"]).toBeUndefined();
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -272,13 +274,18 @@ it.skipIf(process.platform === "win32")(
   },
 );
 
-it.skipIf(process.platform !== "win32")(
-  "discovers the Windows npm prefix and Node without PATH",
-  async () => {
+it.skipIf(process.platform !== "win32").each([
+  { key: "ProgramFiles", installation: "nodejs" },
+  { key: "PROGRAMFILES", installation: "nodejs" },
+  { key: "programfiles", installation: "nodejs" },
+  { key: "PROGRAMFILES", installation: "Volta" },
+])(
+  "discovers Windows npm and Node without PATH using $key and $installation",
+  async ({ key, installation }) => {
     const dir = await mkdtemp(join(tmpdir(), "pi windows 中文 "));
     try {
       const npm = join(dir, "AppData", "npm");
-      const nodeBin = join(dir, "Program Files", "nodejs");
+      const nodeBin = join(dir, "Program Files", installation);
       await mkdir(npm, { recursive: true });
       await mkdir(nodeBin, { recursive: true });
       await writeFile(join(npm, "pi.cmd"), "@echo off");
@@ -289,7 +296,7 @@ it.skipIf(process.platform !== "win32")(
         {
           USERPROFILE: dir,
           APPDATA: join(dir, "AppData"),
-          ProgramFiles: join(dir, "Program Files"),
+          [key]: join(dir, "Program Files"),
           Path: "",
         },
       );
@@ -302,20 +309,221 @@ it.skipIf(process.platform !== "win32")(
   },
 );
 
-it("includes Windows user npm, Volta, nvm and system Node installation locations", () => {
-  const env = {
-    USERPROFILE: "user-home",
-    APPDATA: "roaming",
-    LOCALAPPDATA: "local",
-    ProgramFiles: "programs",
-    NVM_SYMLINK: "selected-nvm",
-  };
-  expect(installationDirectories(env, "win32")).toEqual(
-    expect.arrayContaining([
-      join("roaming", "npm"),
-      join("local", "Volta", "bin"),
-      join("programs", "nodejs"),
-      "selected-nvm",
-    ]),
+it.skipIf(process.platform !== "win32")(
+  "uses Node's first sorted PATH key regardless of environment insertion order",
+  async () => {
+    const dir = await mkdtemp(join(tmpdir(), "pi path 中文 "));
+    try {
+      const first = join(dir, "first");
+      const second = join(dir, "second");
+      for (const bin of [first, second]) {
+        await mkdir(bin);
+        await writeFile(join(bin, "pi.cmd"), "@echo off");
+        await writeFile(join(bin, "pi-launcher.js"), "// fixture");
+      }
+      for (const source of [
+        { PATH: first, Path: second },
+        { Path: second, PATH: first },
+      ]) {
+        const launch = await resolvePiLaunch(
+          { nodePath: process.execPath },
+          source,
+        );
+        expect(launch.args).toEqual([
+          join(await realpath(first), "pi-launcher.js"),
+        ]);
+        expect(launch.env.PATH).toContain(first);
+        expect(launch.env.Path).toBeUndefined();
+        expect(source).toEqual({ PATH: first, Path: second });
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  },
+);
+
+it.each(["C:", "D:", "Z:"])(
+  "resolves Windows installation locations on %s independently of the host platform",
+  (drive) => {
+    const base = `${drive}\\arbitrary 用户`;
+    const paths = (name: string) => win32.join(base, name);
+    const directories = installationDirectories(
+      {
+        userprofile: paths("profile"),
+        HOME: paths("shell-home"),
+        appdata: paths("roaming"),
+        localappdata: paths("local"),
+        PROGRAMFILES: paths("programs"),
+        nvm_symlink: paths("selected-nvm"),
+        volta_home: paths("custom-volta"),
+        NPM_CONFIG_PREFIX: paths("custom-npm"),
+      },
+      "win32",
+    );
+    expect(directories).toEqual(
+      expect.arrayContaining([
+        win32.join(paths("profile"), ".pi", "agent", "bin"),
+        win32.join(paths("roaming"), "npm"),
+        win32.join(paths("local"), "Volta", "bin"),
+        win32.join(paths("programs"), "nodejs"),
+        win32.join(paths("programs"), "Volta"),
+        paths("selected-nvm"),
+        win32.join(paths("custom-volta"), "bin"),
+        paths("custom-npm"),
+      ]),
+    );
+    expect(directories).not.toContain(
+      win32.join(paths("shell-home"), ".pi", "agent", "bin"),
+    );
+  },
+);
+
+it.each(["darwin", "linux"] as const)(
+  "uses POSIX paths and case-sensitive environment names on %s",
+  (platform) => {
+    const directories = installationDirectories(
+      {
+        HOME: "/users/example 中文",
+        USERPROFILE: "/ignored-profile",
+        VOLTA_HOME: "/custom/volta",
+        npm_config_prefix: "/custom/npm",
+        NPM_CONFIG_PREFIX: "/ignored-prefix",
+      },
+      platform,
+    );
+    expect(directories).toEqual(
+      expect.arrayContaining([
+        posix.join("/users/example 中文", ".pi", "agent", "bin"),
+        "/custom/volta/bin",
+        "/custom/npm/bin",
+      ]),
+    );
+    expect(directories).not.toContain("/ignored-prefix/bin");
+  },
+);
+
+async function createInstallation(directory: string) {
+  await mkdir(directory, { recursive: true });
+  const entry = join(directory, "pi-launcher.js");
+  const executable = join(
+    directory,
+    process.platform === "win32" ? "pi.cmd" : "pi",
   );
+  const node = join(
+    directory,
+    process.platform === "win32" ? "node.exe" : "node",
+  );
+  await writeFile(entry, "// fixture");
+  await chmod(entry, 0o755);
+  if (process.platform === "win32") await writeFile(executable, "@echo off");
+  else await symlink(entry, executable);
+  await writeFile(node, "node fixture");
+  await chmod(node, 0o755);
+  return { executable, entry, node };
+}
+
+it.each(["executablePath", "nodePath"] as const)(
+  "finds a relocated installation from %s without PATH",
+  async (setting) => {
+    const home = await mkdtemp(join(tmpdir(), "pi portable 用户 "));
+    try {
+      const installed = await createInstallation(join(home, "custom tools"));
+      const launch = await resolvePiLaunch(
+        {
+          [setting]:
+            setting === "nodePath" ? installed.node : installed.executable,
+        },
+        { HOME: home, USERPROFILE: home, PATH: "" },
+      );
+      expect(launch.command).toBe(installed.node);
+      expect(launch.args).toEqual([await realpath(installed.entry)]);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  },
+);
+
+it.each([
+  "PATH",
+  "VOLTA_HOME",
+  "npm_config_prefix",
+  process.platform === "win32" ? "NVM_SYMLINK" : "NVM_BIN",
+])("discovers a custom installation using %s", async (setting) => {
+  const home = await mkdtemp(join(tmpdir(), "pi custom install 中文 "));
+  try {
+    const root = join(home, "relocated");
+    const bin =
+      setting === "VOLTA_HOME" ||
+      (setting === "npm_config_prefix" && process.platform !== "win32")
+        ? join(root, "bin")
+        : root;
+    const installed = await createInstallation(bin);
+    const launch = await resolvePiLaunch(
+      {},
+      { HOME: home, USERPROFILE: home, PATH: "", [setting]: root },
+    );
+    expect(launch.command).toBe(installed.node);
+    expect(launch.args).toEqual([await realpath(installed.entry)]);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 });
+
+it("keeps explicit settings ahead of PATH and PATH ahead of fallback installations", async () => {
+  const home = await mkdtemp(join(tmpdir(), "pi precedence 中文 "));
+  try {
+    const explicit = await createInstallation(join(home, "explicit"));
+    const inherited = await createInstallation(join(home, "inherited"));
+    const fallback = await createInstallation(
+      process.platform === "win32"
+        ? join(home, "fallback")
+        : join(home, "fallback", "bin"),
+    );
+    const env = {
+      HOME: home,
+      USERPROFILE: home,
+      PATH: join(home, "inherited"),
+      npm_config_prefix: join(home, "fallback"),
+    };
+    const automatic = await resolvePiLaunch({}, env);
+    expect(automatic.command).toBe(inherited.node);
+    expect(automatic.args).toEqual([await realpath(inherited.entry)]);
+    const selected = await resolvePiLaunch(
+      { executablePath: explicit.executable, nodePath: explicit.node },
+      env,
+    );
+    expect(selected.command).toBe(explicit.node);
+    expect(selected.args).toEqual([await realpath(explicit.entry)]);
+    expect(selected.env.PATH?.split(delimiter)[0]).toBe(join(home, "explicit"));
+    const selectedPi = await resolvePiLaunch(
+      { executablePath: explicit.executable },
+      env,
+    );
+    expect(selectedPi.command).toBe(inherited.node);
+    expect(selectedPi.args).toEqual([await realpath(explicit.entry)]);
+    expect(fallback.node).not.toBe(automatic.command);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+it.skipIf(process.platform === "win32")(
+  "keeps PATH separate from an unrelated POSIX Path variable",
+  async () => {
+    const home = await mkdtemp(join(tmpdir(), "pi posix env "));
+    try {
+      const installed = await createInstallation(join(home, "actual"));
+      const env = {
+        HOME: home,
+        PATH: join(home, "actual"),
+        Path: "/unrelated",
+      };
+      const launch = await resolvePiLaunch({}, env);
+      expect(launch.command).toBe(installed.node);
+      expect(launch.env.Path).toBe("/unrelated");
+      expect(env.PATH).toBe(join(home, "actual"));
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  },
+);
