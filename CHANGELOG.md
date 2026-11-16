@@ -1,6 +1,6 @@
 # 更新记录
 
-## 未发布
+## 1.0.5
 
 - 补充 Windows / macOS 常见安装目录与 Node.js 自动发现，处理 VS Code 缺少 shell PATH 的情况。
 - 识别 macOS 官方托管安装与 npm 符号链接，每次连接重新解析当前 PI 版本；明确区分启动器、Node 与文件权限错误。
