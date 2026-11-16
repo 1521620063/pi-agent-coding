@@ -1848,6 +1848,135 @@ try {
         await page.evaluate(() =>
           window.deliver({ type: "snapshot", state: window.fixtureState }),
         );
+        // Resource manager uses real Web Awesome controls inside a native modal.
+        await page.evaluate(() =>
+          window.deliver({
+            type: "resources",
+            reveal: true,
+            state: {
+              workspace: "C:/workspace/中文 项目",
+              agentDir: "C:/agent",
+              busy: false,
+              pending: true,
+              canApply: true,
+              warnings: [],
+              items: [
+                {
+                  id: "abc1",
+                  kind: "mcp",
+                  scope: "project",
+                  name: "filesystem",
+                  detail: "stdio · exposure: 默认 codemode",
+                  state: "配置已启用",
+                  path: "C:/workspace/.pi/mcp.json",
+                  actions: ["edit", "toggle", "exposure", "remove"],
+                },
+                {
+                  id: "abc2",
+                  kind: "skills",
+                  scope: "project",
+                  name: "example-skill",
+                  detail: "本地发现；是否成功加载由 PI 决定",
+                  state: "按 PI 规则加载",
+                  path: "C:/workspace/.pi/skills/example/SKILL.md",
+                  actions: ["open", "toggle"],
+                },
+                {
+                  id: "abc3",
+                  kind: "packages",
+                  scope: "user",
+                  name: "npm:@example/tools",
+                  detail: "skills: 不加载",
+                  state: "已配置包",
+                  path: "C:/agent/settings.json",
+                  actions: ["filters", "update", "remove"],
+                },
+              ],
+            },
+          }),
+        );
+        await page.locator("#resources-dialog[open]").waitFor();
+        assert.ok(
+          await page
+            .locator("#resources-list")
+            .innerText()
+            .then((text) => text.includes("filesystem")),
+        );
+        await page.locator('[data-resource-tab="skills"]').click();
+        assert.ok(
+          await page
+            .locator("#resources-list")
+            .innerText()
+            .then((text) => text.includes("example-skill")),
+        );
+        const resourceSearch = page.locator("#resources-search input");
+        await resourceSearch.fill("missing");
+        assert.ok(
+          await page
+            .locator("#resources-list")
+            .innerText()
+            .then((text) => text.includes("没有匹配")),
+        );
+        await resourceSearch.fill("");
+        await page.locator('[data-resource-tab="extensions"]').click();
+        await page.locator("#resources-scope").click();
+        await page.locator('#resources-scope wa-option[value="user"]').click();
+        assert.ok(
+          await page
+            .locator("#resources-list")
+            .innerText()
+            .then((text) => text.includes("npm:@example/tools")),
+        );
+        assert.equal(
+          await page
+            .locator("#resources-dialog")
+            .evaluate((dialog) => dialog.scrollWidth > dialog.clientWidth + 1),
+          false,
+          `Resource overflow: ${theme} ${width} ${zoom}`,
+        );
+        const resourceBounds = await page
+          .locator("#resources-dialog")
+          .evaluate((dialog) => {
+            const rect = dialog.getBoundingClientRect();
+            return {
+              left: rect.left,
+              right: rect.right,
+              top: rect.top,
+              bottom: rect.bottom,
+              width: window.innerWidth,
+              height: window.innerHeight,
+            };
+          });
+        assert.ok(
+          resourceBounds.left >= -1 &&
+            resourceBounds.right <= resourceBounds.width + 1 &&
+            resourceBounds.top >= -1 &&
+            resourceBounds.bottom <= resourceBounds.height + 1,
+          `Resource viewport bounds: ${theme} ${width} ${zoom} ${JSON.stringify(resourceBounds)}`,
+        );
+        await page.locator("#resources-dialog").evaluate((dialog) => {
+          dialog.scrollTop = 0;
+        });
+        await page.screenshot({
+          path: join(artifacts, `resources-${theme}-${width}-${zoom}.png`),
+          fullPage: false,
+        });
+        await resourceSearch.focus();
+        await page.keyboard.press("Escape");
+        assert.equal(
+          await page
+            .locator("#resources-dialog")
+            .evaluate((dialog) => dialog.open),
+          false,
+        );
+        await page.evaluate(() => {
+          const scope = document.getElementById("resources-scope");
+          scope.value = "project";
+          scope.dispatchEvent(new Event("change"));
+        });
+        await page
+          .locator('[data-resource-tab="mcp"]')
+          .evaluate((button) => button.click());
       }
   }
   assert.deepEqual(failures, []);

@@ -1,0 +1,111 @@
+#resources-dialog {
+  box-sizing: border-box;
+  width: min(720px, calc(100% - 16px));
+  max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px);
+  padding: 12px;
+  color: var(--pi-fg);
+  background: var(--pi-bg);
+  border: 1px solid var(--pi-border);
+  border-radius: 8px;
+  overflow: auto;
+  font: inherit;
+}
+#resources-dialog::backdrop {
+  background: color-mix(in srgb, var(--pi-bg) 78%, transparent);
+}
+.resources-heading,
+.resources-tabs,
+.resources-bottom,
+.resource-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.resources-heading {
+  justify-content: space-between;
+}
+.resources-tabs {
+  margin: 12px 0;
+}
+.resources-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 8px;
+}
+.resources-controls > * {
+  min-width: 0;
+}
+#resources-location,
+.resource-path,
+.resource-item > strong {
+  overflow-wrap: anywhere;
+}
+#resources-location {
+  font-size: 0.9em;
+}
+#resources-feedback:empty {
+  display: none;
+}
+#resources-feedback,
+#resources-error,
+#resources-warnings {
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+#resources-error {
+  color: var(--pi-tool-error);
+}
+#resources-warnings ul {
+  padding-inline-start: 18px;
+}
+.resource-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--pi-border);
+}
+.resource-item > strong {
+  display: block;
+}
+.resource-item p {
+  margin: 5px 0;
+}
+.resource-state {
+  display: inline-block;
+  margin-top: 5px;
+  color: var(--pi-muted);
+  font-size: 0.9em;
+}
+.resource-actions {
+  margin-top: 8px;
+}
+.resource-actions wa-button {
+  max-width: 100%;
+}
+.resource-actions wa-button::part(label) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.resources-bottom {
+  position: sticky;
+  bottom: -12px;
+  padding: 10px 0;
+  background: var(--pi-bg);
+  border-top: 1px solid var(--pi-border);
+}
+.resources-intro,
+#resources-limit {
+  line-height: 1.5;
+}
+@media (max-width: 360px) {
+  .resources-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (forced-colors: active) {
+  #resources-dialog,
+  .resource-item,
+  .resources-bottom {
+    border-color: CanvasText;
+  }
+}

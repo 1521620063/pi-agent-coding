@@ -13,6 +13,7 @@ import { HistoryService } from "./features/history";
 import { ShellService } from "./features/shell";
 import { ActionGate } from "./features/action-gate";
 import { WorkspaceContextService } from "./features/workspace-context";
+import { ResourceService } from "./features/resources";
 import { TaskNotifications } from "./features/notifications";
 import { createActionHandler } from "./host/actions";
 import { createConnection } from "./host/connection";
@@ -164,9 +165,36 @@ export function activate(context: vscode.ExtensionContext) {
       void usage.refreshStats().catch(report);
   });
   const gate = new ActionGate();
+  const resources = new ResourceService(
+    store,
+    (message) => provider.post(message),
+    (workspace) =>
+      gate.run("connect", async () => {
+        const state = store.getSnapshot();
+        if (
+          state.run !== "idle" ||
+          state.compaction.active ||
+          state.shell?.active ||
+          state.queueControl?.busy ||
+          state.queues.steering.length ||
+          state.queues.followUp.length
+        )
+          throw new Error("请先结束当前任务并清空队列，再应用资源配置。");
+        const sessionPath =
+          state.workspace === workspace ? state.session?.path : undefined;
+        await connect(vscode.Uri.file(workspace).toString(), sessionPath);
+        if (store.getSnapshot().connection !== "connected")
+          throw new Error("PI 尚未连接成功，请检查连接错误。");
+        if (sessionPath && store.getSnapshot().session?.path !== sessionPath)
+          throw new Error(
+            "PI 已重连，但未恢复原会话。请从历史中重新打开原会话。",
+          );
+      }),
+  );
   const provider = createSidebarProvider(
     store,
     createActionHandler({
+      resources,
       store,
       controller,
       attachments,
@@ -215,6 +243,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
   context.subscriptions.push(
     output,
+    resources,
     provider,
     {
       dispose: () => {
@@ -233,6 +262,10 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("pi.reconnect", () =>
       gate.run("connect", connect),
     ),
+    vscode.commands.registerCommand("pi.manageResources", async () => {
+      await vscode.commands.executeCommand("pi.sidebar.focus");
+      await resources.show();
+    }),
     vscode.commands.registerCommand("pi.attachSelection", attachSelection),
     vscode.commands.registerCommand(
       "pi.attachFiles",

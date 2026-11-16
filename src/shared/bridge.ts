@@ -1,4 +1,9 @@
 import {
+  parseResourceAction,
+  type ResourceAction,
+  type ResourceSnapshot,
+} from "./resources";
+import {
   isObject,
   type AgentMessage,
   type Model,
@@ -84,6 +89,7 @@ export interface SessionSummary {
   lastOpenedAt: string;
 }
 export type ClientAction =
+  | ResourceAction
   | {
       type:
         | "ready"
@@ -105,7 +111,8 @@ export type ClientAction =
         | "tree"
         | "export"
         | "cancelShell"
-        | "settings";
+        | "settings"
+        | "showResources";
     }
   | {
       type: "send";
@@ -144,6 +151,7 @@ export type ClientAction =
     }
   | { type: "openLink"; url: string };
 export type HostMessage =
+  | { type: "resources"; state: ResourceSnapshot; reveal?: boolean }
   | { type: "snapshot"; state: ViewState }
   | { type: "contextAttached"; id: string; success: boolean }
   | {
@@ -190,9 +198,11 @@ const simple = new Set([
   "export",
   "cancelShell",
   "settings",
+  "showResources",
 ]);
 export function parseClientAction(value: unknown): ClientAction | undefined {
   if (!isObject(value) || typeof value.type !== "string") return;
+  if (value.type === "resourceAction") return parseResourceAction(value);
   const keys = Object.keys(value);
   if (
     value.type === "promoteQueued" &&

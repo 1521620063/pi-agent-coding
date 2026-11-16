@@ -7,6 +7,8 @@ const configs = [
     entryPoints: ["src/extension.ts"],
     outfile: "dist/extension.js",
     platform: "node",
+    // Bundle jsonc-parser's ESM entry; its UMD entry keeps runtime relative requires.
+    mainFields: ["module", "main"],
     format: "cjs",
     external: ["vscode"],
     target: "node20",

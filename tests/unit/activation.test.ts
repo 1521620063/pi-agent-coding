@@ -34,6 +34,11 @@ vi.mock("vscode", () => ({
       return host.folders;
     },
     getConfiguration: () => ({ get: (key: string) => host.config[key] }),
+    onDidSaveTextDocument: () => ({ dispose() {} }),
+  },
+  tasks: {
+    onDidEndTaskProcess: () => ({ dispose() {} }),
+    onDidEndTask: () => ({ dispose() {} }),
   },
   env: {
     get remoteName() {

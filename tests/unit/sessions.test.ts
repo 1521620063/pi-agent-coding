@@ -61,6 +61,17 @@ it("publishes and removes only indexed history entries in the current workspace"
   expect(pi.request).not.toHaveBeenCalled();
 });
 
+it("restores an explicitly requested current session even after its history entry was removed", async () => {
+  const { sessions, pi } = setup();
+  await sessions.remember();
+  await sessions.removeFromHistory("old.jsonl");
+  await sessions.restoreLast("old.jsonl");
+  expect(pi.request).toHaveBeenCalledWith(
+    { type: "switch_session", sessionPath: "old.jsonl" },
+    { timeoutMs: 0 },
+  );
+});
+
 it("does not restore a disconnected session from a late message response", async () => {
   const { store, sessions, pi } = setup();
   store.update({ connection: "connected" });

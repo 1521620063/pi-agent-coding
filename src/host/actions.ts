@@ -14,9 +14,11 @@ import type { ContextService, RetryService } from "../features/context";
 import type { HistoryService } from "../features/history";
 import type { ShellService } from "../features/shell";
 import type { ActionGate } from "../features/action-gate";
+import type { ResourceService } from "../features/resources";
 import { parseBuiltinCommand } from "../shared/commands";
 
 interface ActionServices {
+  resources: ResourceService;
   store: SessionStore;
   controller: PiController;
   attachments: AttachmentService;
@@ -39,6 +41,7 @@ interface ActionServices {
 
 // Actions enter through ActionGate after the sidebar boundary validates them.
 export function createActionHandler({
+  resources,
   store,
   controller,
   attachments,
@@ -59,6 +62,8 @@ export function createActionHandler({
   post,
 }: ActionServices) {
   return async (action: ClientAction): Promise<void> => {
+    if (action.type === "showResources") return resources.show();
+    if (action.type === "resourceAction") return resources.handle(action);
     const commandText = action.type === "send" ? action.text : "";
     const builtin =
       action.type === "send"

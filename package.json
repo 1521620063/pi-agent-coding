@@ -2,7 +2,7 @@
   "name": "pi-agent-coding",
   "displayName": "PI Agent Coding",
   "description": "A native-feeling VS Code sidebar for your locally installed PI coding agent.",
-  "version": "1.0.6",
+  "version": "1.1.0",
   "publisher": "SilasPaul",
   "preview": false,
   "license": "MIT",
@@ -80,6 +80,10 @@
         "title": "PI: Attach Selection"
       },
       {
+        "command": "pi.manageResources",
+        "title": "PI: 管理 MCP、Skills 与扩展"
+      },
+      {
         "command": "pi.reconnect",
         "title": "PI: Reconnect"
       },
@@ -124,6 +128,20 @@
         }
       ]
     },
+    "taskDefinitions": [
+      {
+        "type": "pi-resource",
+        "required": [
+          "operation"
+        ],
+        "properties": {
+          "operation": {
+            "type": "string",
+            "description": "PI resource CLI operation"
+          }
+        }
+      }
+    ],
     "configuration": {
       "title": "PI",
       "properties": {
@@ -193,6 +211,7 @@
   "dependencies": {
     "@awesome.me/webawesome": "3.14.0",
     "dompurify": "^3.4.17",
+    "jsonc-parser": "^3.3.1",
     "markdown-it": "^15.0.3"
   },
   "volta": {

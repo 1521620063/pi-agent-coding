@@ -11,6 +11,7 @@ await build({
   outfile: ".vscode-test/suite.cjs",
   bundle: true,
   platform: "node",
+  mainFields: ["module", "main"],
   format: "cjs",
   external: ["vscode", "mocha"],
 });
@@ -75,7 +76,10 @@ await runTests({
   extensionDevelopmentPath: resolve(process.env.PI_TEST_EXTENSION_DIR ?? "."),
   extensionTestsPath: resolve(".vscode-test/suite.cjs"),
   vscodeExecutablePath,
-  extensionTestsEnv: { PI_TEST_NODE: process.execPath },
+  extensionTestsEnv: {
+    PI_TEST_NODE: process.execPath,
+    PI_CODING_AGENT_DIR: join(workspace, "isolated-pi-agent"),
+  },
   launchArgs: [
     workspace,
     "--disable-extensions",

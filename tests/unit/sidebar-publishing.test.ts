@@ -49,6 +49,37 @@ function fixture() {
   };
 }
 
+it("retains the latest resource state and reveal request until the webview is ready", async () => {
+  const f = fixture();
+  const state = {
+    workspace: "C:/workspace",
+    agentDir: "C:/agent",
+    busy: false,
+    pending: false,
+    canApply: true,
+    warnings: [],
+    items: [],
+  };
+  f.provider.post({ type: "resources", state, reveal: true });
+  f.provider.post({
+    type: "resources",
+    state: { ...state, pending: true },
+    reveal: false,
+  });
+  expect(f.postMessage).not.toHaveBeenCalled();
+  await f.receive({ type: "ready" });
+  expect(f.postMessage.mock.calls.at(-1)?.[0]).toMatchObject({
+    type: "resources",
+    reveal: true,
+    state: { pending: true },
+  });
+  await f.receive({ type: "ready" });
+  expect(f.postMessage.mock.calls.at(-1)?.[0]).toMatchObject({
+    type: "resources",
+    reveal: false,
+  });
+  f.provider.dispose();
+});
 it("coalesces streaming snapshots and sends the latest derived state once", async () => {
   const f = fixture();
   await f.receive({ type: "ready" });

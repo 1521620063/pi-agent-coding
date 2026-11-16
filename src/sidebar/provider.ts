@@ -17,6 +17,8 @@ export function createSidebarProvider(
     readonly isVisible: boolean;
   } {
   let view: vscode.WebviewView | undefined;
+  let ready = false;
+  let resourceMessage: Extract<HostMessage, { type: "resources" }> | undefined;
   const disposables: vscode.Disposable[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
   const cancelSnapshot = () => {
@@ -46,6 +48,7 @@ export function createSidebarProvider(
     resolveWebviewView(current) {
       cancelSnapshot();
       view = current;
+      ready = false;
       current.webview.options = {
         enableScripts: true,
         localResourceRoots: [vscode.Uri.joinPath(extensionUri, "dist")],
@@ -61,7 +64,14 @@ export function createSidebarProvider(
           const action = parseClientAction(value);
           if (!action) return;
           if (action.type === "ready") {
-            if (view === current) await publishSnapshot();
+            if (view === current) {
+              ready = true;
+              await publishSnapshot();
+              if (resourceMessage) {
+                await current.webview.postMessage(resourceMessage);
+                resourceMessage = { ...resourceMessage, reveal: false };
+              }
+            }
             return;
           }
           try {
@@ -88,6 +98,16 @@ export function createSidebarProvider(
       );
     },
     post(message) {
+      if (message.type === "resources") {
+        resourceMessage = {
+          ...message,
+          reveal: message.reveal || resourceMessage?.reveal,
+        };
+        if (!ready || !view) return;
+        void view.webview.postMessage(resourceMessage);
+        resourceMessage = { ...resourceMessage, reveal: false };
+        return;
+      }
       // Keep action acknowledgements after their state changes, as before
       // batching (in particular editor revisions and attachment removal).
       if (timer !== undefined) void publishSnapshot();
@@ -98,6 +118,8 @@ export function createSidebarProvider(
       unsubscribe();
       for (const disposable of disposables) disposable.dispose();
       view = undefined;
+      resourceMessage = undefined;
+      ready = false;
     },
   };
 }

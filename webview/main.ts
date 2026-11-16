@@ -18,6 +18,7 @@ import {
   type FormSwitch,
   type FormTextarea,
 } from "./components";
+import { setupResources } from "./resources";
 import { moreActions, sidebarMarkup } from "./layout";
 import { setupSelections } from "./selections";
 import { PromptHistory, setupComposer } from "./composer";
@@ -38,6 +39,7 @@ root.innerHTML = sidebarMarkup;
 const byId = <T extends HTMLElement = HTMLElement>(id: string) =>
   document.getElementById(id) as T;
 const selections = setupSelections(root, post);
+const resources = setupResources(root, post);
 const prompt = byId<FormTextarea>("prompt");
 const promptText = () => prompt.value ?? "";
 const restored = vscode.getState();
@@ -203,6 +205,10 @@ function updateSend() {
         promotingRevision !== undefined) || state?.connection !== "connected";
 }
 window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
+  if (data.type === "resources") {
+    resources.receive(data.state, data.reveal);
+    return;
+  }
   if (data.type === "showControl") {
     selections.show(data.control);
     return;
@@ -233,6 +239,7 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
   }
   if (data.type !== "snapshot") return;
   state = data.state;
+  resources.renderLive(state);
   if (
     state.error ||
     state.queueControl?.revision !== promotingRevision ||

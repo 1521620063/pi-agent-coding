@@ -143,14 +143,16 @@ export class SessionService {
   async create(): Promise<boolean> {
     return this.change({ type: "new_session" });
   }
-  async restoreLast(): Promise<boolean> {
+  async restoreLast(sessionPath?: string): Promise<boolean> {
     const workspace = this.store.getSnapshot().workspace;
     if (!workspace) return false;
-    const latest = (await this.list(pathToFileURL(workspace).href))[0];
-    if (!latest) return false;
+    const target =
+      sessionPath ??
+      (await this.list(pathToFileURL(workspace).href))[0]?.sessionPath;
+    if (!target) return false;
     return this.change({
       type: "switch_session",
-      sessionPath: latest.sessionPath,
+      sessionPath: target,
     });
   }
   async openFromPicker(): Promise<void> {

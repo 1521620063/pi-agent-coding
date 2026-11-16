@@ -6,7 +6,10 @@ import type { AttachmentService } from "../../src/features/attachments";
 import type { PiController } from "../../src/pi/controller";
 import type { SessionStore } from "../../src/state/session-store";
 import { WorkspaceContextService } from "../../src/features/workspace-context";
-import { writeFile } from "node:fs/promises";
+import { ResourceService } from "../../src/features/resources";
+import type { HostMessage } from "../../src/shared/bridge";
+import type { ResourceSnapshot } from "../../src/shared/resources";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import manifest from "../../package.json";
 export async function run(): Promise<void> {
   const mocha = new Mocha({ ui: "tdd", timeout: 20000, color: false });
@@ -129,6 +132,99 @@ export async function run(): Promise<void> {
       await vscode.commands.executeCommand("pi.open");
       assert.equal(api.store.getSnapshot().session?.id, id);
       assert.equal(api.controller.pid, pid);
+    });
+    test("manages project MCP config through native editor APIs and runs PI CLI as a process task", async () => {
+      const workspace = vscode.workspace.workspaceFolders![0].uri;
+      const directory = vscode.Uri.joinPath(workspace, ".pi");
+      const file = vscode.Uri.joinPath(directory, "mcp.json");
+      await mkdir(directory.fsPath, { recursive: true });
+      await writeFile(
+        file.fsPath,
+        JSON.stringify({
+          unknown: 42,
+          mcpServers: {
+            docs: {
+              command: "unused",
+              enabled: false,
+              env: { TOKEN: "fixture-secret" },
+            },
+          },
+        }),
+      );
+      let latest: ResourceSnapshot | undefined;
+      const service = new ResourceService(
+        api.store,
+        (message: HostMessage) => {
+          if (message.type === "resources") latest = message.state;
+        },
+        async () => {},
+      );
+      const config = vscode.workspace.getConfiguration("pi");
+      const previous = config.get<string>("executablePath");
+      try {
+        await service.show();
+        assert.ok(latest);
+        assert.ok(!JSON.stringify(latest).includes("fixture-secret"));
+        const server = latest.items.find(
+          (item) =>
+            item.kind === "mcp" &&
+            item.scope === "project" &&
+            item.name === "docs",
+        )!;
+        await service.handle({
+          type: "resourceAction",
+          operation: "toggle",
+          scope: "project",
+          kind: "mcp",
+          id: server.id,
+        });
+        assert.equal(latest.error, undefined);
+        const saved = JSON.parse(await readFile(file.fsPath, "utf8"));
+        assert.equal(saved.mcpServers.docs.enabled, true);
+        assert.equal(saved.mcpServers.docs.env.TOKEN, "fixture-secret");
+        assert.equal(saved.unknown, 42);
+        const result = vscode.Uri.joinPath(workspace, "cli-argv.json");
+        const cli = vscode.Uri.joinPath(
+          workspace,
+          "fixture management cli.mjs",
+        );
+        await writeFile(
+          cli.fsPath,
+          `import {writeFileSync} from 'node:fs';writeFileSync(${JSON.stringify(result.fsPath)}, JSON.stringify(process.argv.slice(2)));`,
+        );
+        await config.update(
+          "executablePath",
+          cli.fsPath,
+          vscode.ConfigurationTarget.Global,
+        );
+        await service.handle({
+          type: "resourceAction",
+          operation: "diagnose",
+          scope: "project",
+          kind: "mcp",
+        });
+        const deadline = Date.now() + 10000;
+        let args: unknown;
+        while (Date.now() < deadline) {
+          try {
+            args = JSON.parse(await readFile(result.fsPath, "utf8"));
+            break;
+          } catch {
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+        }
+        assert.deepEqual(args, ["mcp", "list"]);
+        assert.equal(latest.error, undefined);
+      } finally {
+        service.dispose();
+        await config.update(
+          "executablePath",
+          previous,
+          vscode.ConfigurationTarget.Global,
+        );
+      }
+      const commands = await vscode.commands.getCommands(true);
+      assert.ok(commands.includes("pi.manageResources"));
     });
     test("closes its process when disposed", async () => {
       const pid = api.controller.pid;

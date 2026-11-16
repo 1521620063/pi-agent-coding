@@ -1,9 +1,12 @@
+import { resourceMarkup } from "./resources";
+
 export const moreActions = [
   ["renameSession", "重命名会话"],
   ["attachDiagnostics", "选择诊断作为附件"],
   ["touchedFiles", "本次对话修改的文件"],
   ["openScm", "打开源代码管理"],
   ["searchConversation", "搜索 PI 完整历史"],
+  ["showResources", "PI 资源管理（MCP / Skills / 扩展）"],
   ["showCommands", "技能与模板来源"],
   ["cycleModel", "轮换模型"],
   ["cycleThinking", "轮换思考强度"],
@@ -48,6 +51,7 @@ export const sidebarMarkup = `
       </details>
       <div class="settings-action"><span class="muted">立即整理当前会话</span><wa-button data-action="compact" size="s" appearance="outlined" variant="neutral">手动压缩</wa-button></div>
     </div>
+      <wa-button data-action="showResources" size="s" appearance="outlined" variant="neutral">管理 MCP、Skills 与扩展…</wa-button>
       <wa-button data-action="settings" size="s" appearance="plain" variant="neutral">打开 VS Code 插件设置…</wa-button>
     </section>
   </div>
@@ -94,4 +98,5 @@ export const sidebarMarkup = `
     <div class="shell-actions"><wa-button id="run-shell" size="s" appearance="outlined" variant="brand" disabled>运行命令</wa-button><wa-button data-action="cancelShell" id="cancel-shell" size="s" appearance="plain" variant="danger" hidden>取消命令</wa-button></div>
     <pre id="shell-output" aria-live="polite"></pre>
   </div>
-</details>`;
+</details>
+${resourceMarkup}`;

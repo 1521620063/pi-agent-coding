@@ -27,14 +27,17 @@ export function createConnection({
   report,
 }: ConnectionServices) {
   let initializing = false;
-  const connect = async () => {
+  const connect = async (workspaceUri?: string, sessionPath?: string) => {
     const folders = vscode.workspace.workspaceFolders;
-    const folder =
-      folders?.length === 1
+    const folder = workspaceUri
+      ? folders?.find((folder) => folder.uri.toString() === workspaceUri)
+      : folders?.length === 1
         ? folders[0]
         : await vscode.window.showWorkspaceFolderPick({
             placeHolder: "选择 PI 工作目录",
           });
+    if (workspaceUri && !folder)
+      throw new Error("资源管理的工作区目录已关闭，请重新选择。");
     if (!folder && folders?.length) return;
     assertWorkspace({
       trusted: vscode.workspace.isTrusted,
@@ -62,7 +65,8 @@ export function createConnection({
         throw error;
       }
       try {
-        if (!(await sessions.restoreLast())) await sessions.refresh();
+        if (!(await sessions.restoreLast(sessionPath)))
+          await sessions.refresh();
       } catch (error) {
         report(
           new Error(
