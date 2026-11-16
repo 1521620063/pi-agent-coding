@@ -34,6 +34,7 @@ it("discards stale file searches and preserves text until attachment succeeds", 
     () => [],
     () => {},
     new PromptHistory(),
+    () => {},
   );
   composer.refresh();
   await vi.advanceTimersByTimeAsync(120);
@@ -79,36 +80,61 @@ it("discards stale file searches and preserves text until attachment succeeds", 
   vi.useRealTimers();
 });
 
-it("navigates slash completion without sending, and ignores IME Enter", () => {
-  const prompt = Object.assign(document.createElement("wa-textarea"), {
-    value: "/",
-  }) as FormTextarea;
-  const menu = document.createElement("div");
-  menu.hidden = true;
-  const post = vi.fn();
-  const composer = setupComposer(
-    prompt,
-    menu,
-    post,
-    () => [
-      { name: "one", source: "skill" },
-      { name: "two", source: "prompt" },
-    ],
-    () => {},
-    new PromptHistory(),
-  );
-  composer.refresh();
-  expect(
-    composer.keydown(
-      new KeyboardEvent("keydown", { key: "Enter", isComposing: true }),
-    ),
-  ).toBe(false);
-  composer.keydown(new KeyboardEvent("keydown", { key: "ArrowDown" }));
-  composer.refresh(); // Streaming snapshots must not reset the highlighted command.
-  composer.keydown(new KeyboardEvent("keydown", { key: "Tab" }));
-  expect(prompt.value).toBe("/compact ");
-  expect(post).not.toHaveBeenCalled();
-});
+it.each(["Enter", "Tab", "click"])(
+  "executes a slash command immediately on %s and ignores IME confirmation",
+  (confirmation) => {
+    const prompt = Object.assign(document.createElement("wa-textarea"), {
+      value: "/",
+    }) as FormTextarea;
+    const menu = document.createElement("div");
+    menu.hidden = true;
+    const post = vi.fn();
+    const submit = vi.fn(() => expect(prompt.value).toBe("/compact "));
+    const save = vi.fn();
+    const composer = setupComposer(
+      prompt,
+      menu,
+      post,
+      () => [],
+      save,
+      new PromptHistory(),
+      submit,
+    );
+    composer.refresh();
+    expect(
+      composer.keydown(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          isComposing: true,
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      composer.keydown(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          shiftKey: true,
+        }),
+      ),
+    ).toBe(false);
+    expect(submit).not.toHaveBeenCalled();
+    composer.keydown(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+    composer.refresh(); // Streaming snapshots preserve the highlighted command.
+    if (confirmation === "click") (menu.children[1] as HTMLElement).click();
+    else {
+      const event = new KeyboardEvent("keydown", {
+        key: confirmation,
+        cancelable: true,
+      });
+      expect(composer.keydown(event)).toBe(true);
+      expect(event.defaultPrevented).toBe(true);
+    }
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(menu.hidden).toBe(true);
+    expect(post).not.toHaveBeenCalled();
+  },
+);
 
 it("scrolls the highlighted completion into view after the list renders", async () => {
   const prompt = Object.assign(document.createElement("wa-textarea"), {
@@ -123,6 +149,7 @@ it("scrolls the highlighted completion into view after the list renders", async 
     () => [],
     () => {},
     new PromptHistory(),
+    () => {},
   );
   composer.refresh();
   const first = menu.firstElementChild as HTMLElement;
@@ -151,6 +178,7 @@ it("offers built-in session commands without PI-discovered commands", () => {
     () => [],
     () => {},
     new PromptHistory(),
+    () => {},
   );
   composer.refresh();
   expect(menu.textContent).toContain("/new");
@@ -167,6 +195,7 @@ it("prioritizes shortcuts while preserving PI commands with colliding names", ()
     value: "/",
   }) as FormTextarea;
   const menu = document.createElement("div");
+  const submit = vi.fn();
   const composer = setupComposer(
     prompt,
     menu,
@@ -180,6 +209,7 @@ it("prioritizes shortcuts while preserving PI commands with colliding names", ()
     ],
     () => {},
     new PromptHistory(),
+    submit,
   );
   composer.refresh();
   expect(menu.firstElementChild?.textContent).toContain("/new");
@@ -187,6 +217,9 @@ it("prioritizes shortcuts while preserving PI commands with colliding names", ()
   composer.refresh();
   expect(menu.textContent).toContain("自定义模板");
   expect(menu.querySelectorAll("[role=option]")).toHaveLength(1);
+  composer.keydown(new KeyboardEvent("keydown", { key: "Enter" }));
+  expect(prompt.value).toBe("/model ");
+  expect(submit).toHaveBeenCalledTimes(1);
 });
 
 it("restores a draft with Down after recalling a multiline history entry", () => {
@@ -205,6 +238,7 @@ it("restores a draft with Down after recalling a multiline history entry", () =>
     () => [],
     () => {},
     history,
+    () => {},
   );
   input.setSelectionRange(0, 0);
   expect(
@@ -246,6 +280,7 @@ it.each([{ entries: [] }, { entries: ["older prompt"] }])(
       () => [],
       save,
       new PromptHistory(entries),
+      () => {},
     );
     const event = new KeyboardEvent("keydown", {
       key: "ArrowDown",

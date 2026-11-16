@@ -60,6 +60,7 @@ export function setupComposer(
   }[],
   save: () => void,
   history: PromptHistory,
+  submit: () => void,
 ) {
   let requestId = 0;
   let active = 0;
@@ -176,6 +177,7 @@ export function setupComposer(
             prompt.value = `/${cmd.name} `;
             history.reset();
             save();
+            submit();
           },
         }));
       active = Math.max(

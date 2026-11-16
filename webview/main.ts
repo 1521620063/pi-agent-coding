@@ -71,6 +71,7 @@ const composer = setupComposer(
     updateSend();
   },
   inputHistory,
+  send,
 );
 byId<FormInput>("conversation-search").addEventListener("input", () => {
   if (state)

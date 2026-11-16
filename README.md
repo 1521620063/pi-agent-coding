@@ -4,7 +4,7 @@
 
 插件通过 `pi --mode rpc` 桥接本机 PI：界面与编辑器上下文由插件提供，推理、模型、工具、技能和会话仍由 PI 管理。交互组织参考 Codex / Claude Code 的侧栏方式，视觉优先参考 PI 自身的文本布局、消息配色和紧凑状态栏，并适配 VS Code 主题。
 
-当前版本为 **1.0.5（正式版）**，扩展标识为 `SilasPaul.pi-agent-coding`。PI 协议验证基线为 **1.5.2**，兼容目标为 **Windows 与 macOS 本地环境**；首次上架完成前可通过 VSIX 安装。具体变更见 [更新记录](CHANGELOG.md)。
+当前版本为 **1.0.6（正式版）**，扩展标识为 `SilasPaul.pi-agent-coding`。PI 协议验证基线为 **1.5.2**，兼容目标为 **Windows 与 macOS 本地环境**；首次上架完成前可通过 VSIX 安装。具体变更见 [更新记录](CHANGELOG.md)。
 
 验收范围：Windows 保留既有本地验证基线；本轮在 macOS 验证了自动发现、真实 PI RPC 握手、模拟进程清理和原生 VS Code 扩展宿主，跨平台 CI 尚未配置；真实模型生成、真实 MCP / 扩展交互和长会话成功压缩尚未完成端到端验收。模拟进程、浏览器夹具和扩展宿主测试不代表这些真实环境已经通过。完整说明见“范围与限制”。
 
@@ -49,7 +49,7 @@ PI 运行时显示暖金色心电图折线，高亮沿波形从左向右循环�
 
 各项操作是否可用取决于所安装 PI 的 RPC 能力、模型和扩展配置。真实 MCP 环境与长会话成功压缩尚未完成验收。
 
-在聊天输入框输入 `/`，可选择 PI 发现的技能、提示模板、扩展命令，以及以下插件快捷操作。方向键选择，`Tab` / `Enter` 补全，再按 `Enter` 执行。
+在聊天输入框输入 `/`，可选择 PI 发现的技能、提示模板、扩展命令，以及以下插件快捷操作。方向键选择，鼠标点击或按 `Tab` / `Enter` 确认后立即执行，无需再次发送；需要附带参数时，手动输入完整命令和参数后再发送。
 
 | 快捷命令              | 操作                                                                 |
 | --------------------- | -------------------------------------------------------------------- |
@@ -85,7 +85,7 @@ Windows 与 macOS 使用相同的 RPC 桥接；macOS 已验证本地扩展宿主
 
 上架后，可在扩展视图中搜索 `@id:SilasPaul.pi-agent-coding`，核对发布者为 **SilasPaul** 后安装；也可通过命令 `code --install-extension SilasPaul.pi-agent-coding` 安装。首次上架前请使用下面的 VSIX 方式。
 
-打开 VS Code 命令面板（Windows：`Ctrl+Shift+P`；macOS：`Cmd+Shift+P`），运行 **Extensions: Install from VSIX…**，选择 `pi-agent-coding-1.0.5.vsix`。
+打开 VS Code 命令面板（Windows：`Ctrl+Shift+P`；macOS：`Cmd+Shift+P`），运行 **Extensions: Install from VSIX…**，选择 `pi-agent-coding-1.0.6.vsix`。
 
 如果从源码开始，在仓库根目录执行以下命令生成安装包：
 
@@ -97,7 +97,7 @@ npm run package
 安装包生成于仓库根目录，文件名随 `package.json` 中的版本变化。也可以用 VS Code CLI 安装已生成的包：
 
 ```powershell
-code --install-extension .\pi-agent-coding-1.0.5.vsix
+code --install-extension .\pi-agent-coding-1.0.6.vsix
 ```
 
 ### 3. 连接 PI
@@ -163,7 +163,7 @@ macOS 如果从 Dock 启动 VS Code 后提示找不到 PI，请先在终端运�
 
 ### 模型、思考强度与斜杠命令
 
-点击底部模型名称或思考强度，在对应按钮旁展开的侧栏下拉菜单中选择 PI 返回的可用选项。下拉选项以背景高亮表示选中状态，不显示对勾。菜单支持键盘导航和 Escape 关闭。在输入框键入 `/` 可筛选 PI 发现的技能、提示模板和扩展命令，选择后补充参数并发送，内容的解释与展开由 PI 完成。
+点击底部模型名称或思考强度，在对应按钮旁展开的侧栏下拉菜单中选择 PI 返回的可用选项。下拉选项以背景高亮表示选中状态，不显示对勾。菜单支持键盘导航和 Escape 关闭。在输入框键入 `/` 可筛选 PI 发现的技能、提示模板和扩展命令，选择后立即发送执行，内容的解释与展开由 PI 完成。需要补充参数时，可手动输入完整命令，例如 `/compact 保留重点`，然后发送。
 
 菜单展示 PI 通过 RPC 发现的命令及前述插件快捷操作，不等同于 PI 终端界面的全部内置命令。需要交互登录、终端设置或自定义终端 UI 的操作仍应在 PI 自身完成。
 

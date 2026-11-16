@@ -478,10 +478,85 @@ try {
   );
   assert.equal(await prompt.inputValue(), "");
   assert.equal(await page.locator("#command-menu").isVisible(), false);
+  const sendsBeforeCommand = await page.evaluate(
+    () => window.actions.filter((action) => action.type === "send").length,
+  );
   await prompt.fill("/");
   await prompt.press("ArrowDown");
   await prompt.press("Tab");
   assert.equal(await prompt.inputValue(), "/compact ");
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "send",
+    text: "/compact ",
+    attachmentIds: [],
+    mode: "followUp",
+  });
+  await prompt.press("Enter");
+  await page.evaluate(() => document.getElementById("send").click());
+  assert.equal(
+    await page.evaluate(
+      () => window.actions.filter((action) => action.type === "send").length,
+    ),
+    sendsBeforeCommand + 1,
+    "Selecting a command submits once while awaiting acknowledgement",
+  );
+  await page.evaluate(() =>
+    window.deliver({ type: "sent", attachmentIds: [], preserveDraft: true }),
+  );
+  assert.equal(
+    await prompt.inputValue(),
+    "/compact ",
+    "Cancelled commands keep their draft",
+  );
+  await prompt.fill("/");
+  await prompt.press("Enter");
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "send",
+    text: "/new ",
+    attachmentIds: [],
+    mode: "followUp",
+  });
+  await page.evaluate(() =>
+    window.deliver({ type: "sent", attachmentIds: [] }),
+  );
+  assert.equal(await prompt.inputValue(), "");
+  // Discovered commands use the same immediate execution path.
+  await prompt.fill("/alpha");
+  await page
+    .locator('#command-menu [role="option"]')
+    .filter({ hasText: "/alpha ·" })
+    .click();
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "send",
+    text: "/alpha ",
+    attachmentIds: [],
+    mode: "followUp",
+  });
+  await page.evaluate(() =>
+    window.deliver({ type: "sent", attachmentIds: [] }),
+  );
+  // Selecting a command still respects connection and queue-operation guards.
+  for (const blocked of [
+    { connection: "disconnected" },
+    { queueControl: { revision: 9, busy: true, canSteer: false } },
+  ]) {
+    await page.evaluate(
+      (blocked) =>
+        window.deliver({
+          type: "snapshot",
+          state: { ...window.fixtureState, ...blocked },
+        }),
+      blocked,
+    );
+    const before = await page.evaluate(() => window.actions.length);
+    await prompt.fill("/new");
+    await prompt.press("Enter");
+    assert.equal(await page.evaluate(() => window.actions.length), before);
+    assert.equal(await prompt.inputValue(), "/new ");
+  }
+  await page.evaluate(() =>
+    window.deliver({ type: "snapshot", state: window.fixtureState }),
+  );
   await prompt.fill("/");
   for (const name of [
     "new",
@@ -507,6 +582,15 @@ try {
   await prompt.fill("/comp");
   await prompt.press("Tab");
   assert.equal(await prompt.inputValue(), "/compact ");
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "send",
+    text: "/compact ",
+    attachmentIds: [],
+    mode: "followUp",
+  });
+  await page.evaluate(() =>
+    window.deliver({ type: "sent", attachmentIds: [] }),
+  );
   await prompt.fill("/compact 保留文件名");
   await prompt.press("Enter");
   assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
@@ -525,8 +609,17 @@ try {
     ["resume", "history", "#history-panel"],
     ["settings", "settings", "#settings-panel"],
   ]) {
-    await prompt.fill(`/${command} `);
-    await prompt.press("Enter");
+    await prompt.fill(`/${command}`);
+    await page
+      .locator('#command-menu [role="option"]')
+      .filter({ hasText: `/${command} ·` })
+      .click();
+    assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+      type: "send",
+      text: `/${command} `,
+      attachmentIds: [],
+      mode: "followUp",
+    });
     if (control === "model" || control === "thinking")
       await page.evaluate((selector) => {
         window.menuShown = new Promise((resolve) =>
@@ -577,14 +670,16 @@ try {
   );
   await prompt.fill("/st");
   await prompt.press("Tab");
-  assert.equal(await page.locator("#send").isEnabled(), true);
-  await page.locator("#send").click();
   assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
     type: "send",
     text: "/stop ",
     attachmentIds: [],
     mode: "followUp",
   });
+  assert.equal(
+    await page.locator("#send").evaluate((node) => node.disabled),
+    true,
+  );
   await page.evaluate(() =>
     window.deliver({ type: "commandCompleted", text: "/stop " }),
   );
