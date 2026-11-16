@@ -6,6 +6,7 @@ import {
   type JsonObject,
 } from "../src/pi/protocol";
 import type { ToolView, ViewState } from "../src/shared/bridge";
+import { splitAttachments } from "../src/shared/attachment-message";
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
 const original = md.validateLink.bind(md);
 const localReference = (url: string) =>
@@ -521,13 +522,16 @@ function renderContent(
   tools: Map<string, HTMLElement>,
 ) {
   if (typeof message.content === "string") {
-    appendText(node, message.content);
+    if (message.role === "user") appendUserText(node, message.content);
+    else appendText(node, message.content);
     return;
   }
   for (const [blockIndex, block] of message.content.entries()) {
     if (!block) continue;
-    if (block.type === "text") appendText(node, block.text ?? "");
-    else if (block.type === "thinking") {
+    if (block.type === "text") {
+      if (message.role === "user") appendUserText(node, block.text ?? "");
+      else appendText(node, block.text ?? "");
+    } else if (block.type === "thinking") {
       const details = element("details", "thinking");
       details.dataset.key = `thinking-${index}-${blockIndex}`;
       details.append(
@@ -541,6 +545,42 @@ function renderContent(
       if (tool) node.append(tool);
     }
   }
+}
+function appendUserText(node: HTMLElement, text: string) {
+  const parsed = splitAttachments(text);
+  if (parsed.text) appendText(node, parsed.text);
+  if (!parsed.attachments.length) return;
+  const list = element("ul", "message-attachments");
+  list.setAttribute("aria-label", "已发送附件");
+  for (const attachment of parsed.attachments) {
+    const item = element("li", "message-attachment");
+    const name = attachment.reference
+      ? contentButton(attachment.name)
+      : element("span", "message-attachment-name", attachment.name);
+    name.classList.add("message-attachment-name");
+    if (attachment.reference) {
+      name.dataset.reference = attachment.reference;
+      name.title = attachment.reference;
+    }
+    const size =
+      attachment.size < 1024
+        ? `${attachment.size} B`
+        : attachment.size < 1024 * 1024
+          ? `${(attachment.size / 1024).toFixed(1)} KiB`
+          : `${(attachment.size / (1024 * 1024)).toFixed(1)} MiB`;
+    item.append(
+      name,
+      element(
+        "span",
+        "muted",
+        attachment.kind === "directory"
+          ? "文件夹 · 按需读取"
+          : `${attachment.kind === "image" ? "图片" : "文本"} · ${size}`,
+      ),
+    );
+    list.append(item);
+  }
+  node.append(list);
 }
 function appendText(node: HTMLElement, text: string) {
   const body = element("div", "markdown");

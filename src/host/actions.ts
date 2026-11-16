@@ -115,11 +115,11 @@ export function createActionHandler({
       }
       if (action.type === "attachContext") {
         try {
-          await workspaceContext.attach(action.id);
+          const attached = await workspaceContext.attach(action.id);
           post({
             type: "contextAttached",
             id: action.id,
-            success: true,
+            success: attached !== false,
           });
         } catch (error) {
           post({

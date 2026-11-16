@@ -151,7 +151,7 @@ export function setupComposer(
       const id = ++requestId;
       options = [];
       active = 0;
-      draw("搜索文件… · @open: 已打开 · @current: 当前文件");
+      draw("搜索文件或文件夹… · @open: 已打开 · @current: 当前文件");
       timer = setTimeout(
         () => post({ type: "searchFiles", query, requestId: id }),
         120,

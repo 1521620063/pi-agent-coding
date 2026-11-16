@@ -1,7 +1,14 @@
 import * as vscode from "vscode";
 import { randomUUID } from "node:crypto";
 import { realpath, stat } from "node:fs/promises";
-import { basename, isAbsolute, relative, resolve, sep } from "node:path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 import type { AttachmentService } from "./attachments";
 import type { SessionStore } from "../state/session-store";
 
@@ -15,6 +22,7 @@ interface Candidate {
   uri: vscode.Uri;
   root: string;
   document?: vscode.TextDocument;
+  kind?: "directory" | "picker";
 }
 const fileLimit = 5 * 1024 * 1024;
 const pathKey = (path: string) => {
@@ -82,6 +90,7 @@ export class WorkspaceContextService {
         document?: vscode.TextDocument;
         source: ContextFile["source"];
         label: string;
+        kind?: "directory" | "picker";
       }
     >();
     const current = vscode.window.activeTextEditor?.document;
@@ -144,32 +153,93 @@ export class WorkspaceContextService {
       for (const uri of [...targeted.slice(0, 2000), ...files.slice(0, 2000)]) {
         if (uri.scheme !== "file" || !isInside(root, uri.fsPath)) continue;
         const label = relative(root, uri.fsPath).replace(/\\/g, "/");
-        if (!matches(label, term) || results.has(uri.toString())) continue;
-        results.set(uri.toString(), { uri, source: "workspace", label });
+        if (matches(label, term) && !results.has(uri.toString()))
+          results.set(uri.toString(), { uri, source: "workspace", label });
+        // findFiles enumerates paths only; infer searchable parent folders without
+        // reading file contents or scanning the workspace a second time.
+        let folder = dirname(uri.fsPath);
+        while (isInside(root, folder) && pathKey(folder) !== pathKey(root)) {
+          const folderUri = vscode.Uri.file(folder);
+          const folderLabel = `${relative(root, folder).replace(/\\/g, "/")}/`;
+          if (matches(folderLabel, term) && !results.has(folderUri.toString()))
+            results.set(folderUri.toString(), {
+              uri: folderUri,
+              source: "workspace",
+              label: folderLabel,
+              kind: "directory",
+            });
+          folder = dirname(folder);
+        }
       }
     }
     const values = [...results.values()];
-    truncated ||= values.length > 30;
-    const items = values.slice(0, 30).map((value): ContextFile => {
+    // A picker also covers empty folders and directories beyond the bounded index.
+    const visible = values.slice(0, limitSource ? 30 : 29);
+    truncated ||= values.length > visible.length;
+    if (!limitSource)
+      visible.push({
+        uri: vscode.Uri.file(root),
+        source: "workspace",
+        label: "选择文件夹…",
+        kind: "picker",
+      });
+    const items = visible.map((value): ContextFile => {
       const id = randomUUID();
       this.candidates.set(id, {
         uri: value.uri,
         root,
         document: value.document,
+        kind: value.kind,
       });
-      return { id, label: value.label, source: value.source };
+      return {
+        id,
+        label: value.label,
+        source: value.source,
+        ...(value.kind
+          ? {
+              description:
+                value.kind === "directory"
+                  ? "文件夹"
+                  : "包括空文件夹 · 仅当前工作区",
+            }
+          : {}),
+      };
     });
     while (this.candidates.size > 2000)
       this.candidates.delete(this.candidates.keys().next().value!);
     return { items, truncated };
   }
 
-  async attach(id: string): Promise<void> {
+  async attach(id: string): Promise<void | false> {
     const root = this.root();
     const candidate = this.candidates.get(id);
     if (!candidate || pathKey(candidate.root) !== pathKey(root))
       throw new Error("文件候选已过期，请重新搜索。");
     this.candidates.delete(id);
+    if (candidate.kind) {
+      const selected =
+        candidate.kind === "picker"
+          ? await vscode.window.showOpenDialog({
+              canSelectFiles: false,
+              canSelectFolders: true,
+              canSelectMany: false,
+              defaultUri: vscode.Uri.file(root),
+              title: "选择工作区文件夹",
+            })
+          : [candidate.uri];
+      if (!selected?.length) return false;
+      if (selected[0].scheme !== "file") throw new Error("仅支持本地文件夹。");
+      const actual = await this.validateWorkspacePath(
+        root,
+        selected[0].fsPath,
+        true,
+      );
+      const name =
+        relative(root, selected[0].fsPath).replace(/\\/g, "/") ||
+        basename(root);
+      this.attachments.addDirectory(`${name}/`, actual);
+      return;
+    }
     if (candidate.uri.scheme === "untitled") {
       const document = vscode.workspace.textDocuments.find(
         (doc) => doc.uri.toString() === candidate.uri.toString(),
@@ -208,6 +278,14 @@ export class WorkspaceContextService {
     root: string,
     candidate: string,
   ): Promise<string> {
+    return this.validateWorkspacePath(root, candidate, false);
+  }
+
+  private async validateWorkspacePath(
+    root: string,
+    candidate: string,
+    directory: boolean,
+  ): Promise<string> {
     if (!isInside(root, candidate)) throw new Error("文件不属于当前工作区。");
     const [actualRoot, actual] = await Promise.all([
       realpath(root),
@@ -216,8 +294,9 @@ export class WorkspaceContextService {
     if (!isInside(actualRoot, actual))
       throw new Error("文件链接指向工作区之外。");
     const info = await stat(actual);
-    if (!info.isFile()) throw new Error("请选择文件。");
-    if (info.size > fileLimit)
+    if (directory ? !info.isDirectory() : !info.isFile())
+      throw new Error(directory ? "请选择文件夹。" : "请选择文件。");
+    if (!directory && info.size > fileLimit)
       throw new Error("插件附件限制：每个文件不超过 5 MiB。");
     if (pathKey(this.root()) !== pathKey(root))
       throw new Error("工作区已改变，请重新选择。");
@@ -308,9 +387,17 @@ export class WorkspaceContextService {
       throw new Error("文件不属于当前工作区。");
     if (!isInside(actualRoot, actual) && !allowed(actual))
       throw new Error("文件不属于当前工作区。");
-    if (!(await stat(actual)).isFile()) throw new Error("请选择文件。");
+    const info = await stat(actual);
     if (pathKey(this.root()) !== pathKey(root))
       throw new Error("工作区已改变，请重新选择。");
+    if (info.isDirectory() && isInside(actualRoot, actual)) {
+      await vscode.commands.executeCommand(
+        "revealInExplorer",
+        vscode.Uri.file(actual),
+      );
+      return;
+    }
+    if (!info.isFile()) throw new Error("请选择文件。");
     const document = await vscode.workspace.openTextDocument(
       vscode.Uri.file(actual),
     );

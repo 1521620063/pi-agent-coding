@@ -259,6 +259,27 @@ pre {
   padding-left: 6px;
   margin: 4px 0;
 }
+.message-attachments {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 0;
+  display: grid;
+  gap: 4px;
+}
+.message-attachment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  min-width: 0;
+  font-size: var(--pi-font-small);
+}
+.message-attachment-name {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
 #attachments {
   display: flex;
   flex-wrap: wrap;

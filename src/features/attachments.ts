@@ -3,6 +3,7 @@ import { basename, extname } from "node:path";
 import { readFile, realpath, stat } from "node:fs/promises";
 import type * as vscode from "vscode";
 import type { Attachment } from "../shared/bridge";
+import { encodeAttachment } from "../shared/attachment-message";
 import type { ImageContent } from "../pi/protocol";
 import type { SessionStore } from "../state/session-store";
 interface StoredAttachment {
@@ -51,7 +52,20 @@ export class AttachmentService {
       preview: text.slice(0, 300),
       ...(reference ? { reference } : {}),
     };
-    return this.add({ metadata, text: `[${name}]\n${text}` });
+    return this.add({ metadata, text });
+  }
+  addDirectory(name: string, reference: string): Attachment {
+    return this.add({
+      metadata: {
+        id: randomUUID(),
+        name,
+        kind: "directory",
+        size: 0,
+        preview: "文件夹引用 · 由 PI 按需读取",
+        reference,
+      },
+      text: `用户选择的工作区文件夹：${reference}\n请根据任务需要查看该目录及其中的文件。`,
+    });
   }
   async addFile(path: string, name = basename(path)): Promise<Attachment> {
     const actual = await realpath(path);
@@ -137,7 +151,7 @@ export class AttachmentService {
       );
     return {
       text: selected
-        .flatMap((item) => (item.text ? [item.text] : []))
+        .map((item) => encodeAttachment(item.metadata, item.text ?? ""))
         .join("\n\n"),
       images,
     };

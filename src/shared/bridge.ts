@@ -11,7 +11,7 @@ export type Unsubscribe = () => void;
 export interface Attachment {
   id: string;
   name: string;
-  kind: "text" | "image";
+  kind: "text" | "image" | "directory";
   size: number;
   preview: string;
   reference?: string;

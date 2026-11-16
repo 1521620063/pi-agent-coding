@@ -13,6 +13,8 @@ const fixture = await build({
     resolveDir: process.cwd(),
     contents: `
   import { SessionStore } from './src/state/session-store';
+  import { encodeAttachment } from './src/shared/attachment-message';
+  window.attachmentFixture = encodeAttachment({name:'src/中文名称很长的文件.ts',kind:'text',size:4096,reference:'C:/workspace/src/中文名称很长的文件.ts'}, 'PRIVATE FILE CONTENT') + '\\n\\n' + encodeAttachment({name:'src/',kind:'directory',size:0,reference:'C:/workspace/src'}, '用户选择的工作区文件夹');
   const store = new SessionStore();
   store.update({connection:'connected',workspace:'C:/workspace',session:{id:'fixture'},
     model:{id:'test',provider:'fixture',input:['text']},models:[{id:'test',provider:'fixture',input:['text']}],
@@ -26,7 +28,7 @@ const fixture = await build({
   window.acquireVsCodeApi=()=>({getState:()=>({draft:'保留草稿'}),setState:(s)=>window.saved=s,postMessage:(action)=>{
     window.actions.push(action);
     if(action.type==='ready') queueMicrotask(()=>window.deliver({type:'snapshot',state:window.fixtureState}));
-    if(action.type==='searchFiles') queueMicrotask(()=>window.deliver({type:'fileCandidates',requestId:action.requestId,items:[{id:'one',label:'main.ts',source:'workspace'},{id:'two',label:'中文.ts',source:'open'}],truncated:false}));
+    if(action.type==='searchFiles') queueMicrotask(()=>window.deliver({type:'fileCandidates',requestId:action.requestId,items:action.query==='src'?[{id:'folder',label:'src/',description:'文件夹',source:'workspace'}]:[{id:'one',label:'main.ts',source:'workspace'},{id:'two',label:'中文.ts',source:'open'}],truncated:false}));
   }});
   await import('./webview/main');
 `,
@@ -146,6 +148,37 @@ try {
   await page.locator("#model-name").filter({ hasText: "test" }).waitFor();
   const prompt = page.locator("#prompt textarea");
   assert.equal(await prompt.inputValue(), "保留草稿");
+  // Folder mentions use the same keyboard and acknowledgement flow as files.
+  await prompt.fill("@src");
+  await page
+    .locator('#command-menu [role="option"]')
+    .filter({ hasText: "src/ · 文件夹" })
+    .waitFor();
+  await prompt.press("Enter");
+  assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+    type: "attachContext",
+    id: "folder",
+  });
+  await page.evaluate(() =>
+    window.deliver({ type: "contextAttached", id: "folder", success: false }),
+  );
+  assert.equal(
+    await prompt.inputValue(),
+    "@src",
+    "Cancelling a folder picker preserves the mention",
+  );
+  await prompt.fill("");
+  await prompt.fill("@src");
+  await page
+    .locator('#command-menu [role="option"]')
+    .filter({ hasText: "src/ · 文件夹" })
+    .waitFor();
+  await prompt.press("Tab");
+  await page.evaluate(() =>
+    window.deliver({ type: "contextAttached", id: "folder", success: true }),
+  );
+  assert.equal(await prompt.inputValue(), "");
+  await prompt.fill("保留草稿");
   // A closed connection must release local send state without discarding the draft.
   await prompt.fill("断开后保留的草稿");
   await prompt.press("Enter");
@@ -907,6 +940,67 @@ try {
         );
         if (theme !== "contrast")
           assert.equal(palette.selectionText, expectedAccent);
+        // Verify attachment summaries with the real browser in every theme/width/zoom.
+        await page.evaluate(() =>
+          window.deliver({
+            type: "snapshot",
+            state: {
+              ...window.fixtureState,
+              tools: [],
+              messages: [
+                {
+                  role: "user",
+                  content: "分析这些附件\n\n" + window.attachmentFixture,
+                },
+              ],
+              queues: {
+                steering: [],
+                followUp: ["分析附件\n\n" + window.attachmentFixture],
+              },
+            },
+          }),
+        );
+        await page.locator(".message-attachment").first().waitFor();
+        assert.equal(await page.locator(".message-attachment").count(), 2);
+        assert.equal(
+          await page
+            .locator("#transcript")
+            .getByText("PRIVATE FILE CONTENT")
+            .count(),
+          0,
+        );
+        assert.ok(
+          !(await page.locator("#queue").textContent()).includes(
+            "PRIVATE FILE CONTENT",
+          ),
+        );
+        assert.match(
+          await page.locator(".message-attachments").textContent(),
+          /4.0 KiB/,
+        );
+        const attachmentButton = page
+          .locator(".message-attachment-name")
+          .first();
+        await attachmentButton.focus();
+        await attachmentButton.press("Enter");
+        assert.deepEqual(await page.evaluate(() => window.actions.at(-1)), {
+          type: "openFile",
+          reference: "C:/workspace/src/中文名称很长的文件.ts",
+        });
+        assert.ok(
+          await page.evaluate(() => {
+            const transcript = document.getElementById("transcript");
+            return transcript.scrollWidth <= transcript.clientWidth + 1;
+          }),
+          `Attachment overflow: ${theme} ${width} ${zoom}`,
+        );
+        await page.screenshot({
+          path: join(artifacts, `attachments-${theme}-${width}-${zoom}.png`),
+          fullPage: true,
+        });
+        await page.evaluate(() =>
+          window.deliver({ type: "snapshot", state: window.fixtureState }),
+        );
         // A real browser verifies native disclosure behavior and compact tool rows.
         await page.evaluate(() => {
           const tools = Array.from({ length: 7 }, (_, index) => ({

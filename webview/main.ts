@@ -22,6 +22,7 @@ import { moreActions, sidebarMarkup } from "./layout";
 import { setupSelections } from "./selections";
 import { PromptHistory, setupComposer } from "./composer";
 import { parseBuiltinCommand } from "../src/shared/commands";
+import { splitAttachments } from "../src/shared/attachment-message";
 import type { WaSelectEvent } from "@awesome.me/webawesome/dist/events/select.js";
 import "./forms.css";
 declare function acquireVsCodeApi(): {
@@ -469,11 +470,21 @@ function renderQueue() {
   for (const [kind, items] of Object.entries(state.queues))
     items.forEach((text, index) => {
       const row = element("div", "queue-item");
+      const parsed = splitAttachments(text);
+      const summary = [
+        parsed.text,
+        ...parsed.attachments.map(
+          (item) =>
+            `${item.kind === "directory" ? "文件夹" : "附件"}：${item.name}`,
+        ),
+      ]
+        .filter(Boolean)
+        .join("\n");
       row.append(
         element(
           "span",
           "queue-text",
-          `${kind === "steering" ? "补充指示" : "后续消息"} · ${text}`,
+          `${kind === "steering" ? "补充指示" : "后续消息"} · ${summary}`,
         ),
       );
       if (kind === "followUp") {

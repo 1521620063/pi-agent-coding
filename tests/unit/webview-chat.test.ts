@@ -1,6 +1,62 @@
 // @vitest-environment jsdom
 import { expect, it } from "vitest";
-import { renderMarkdown, shouldSend } from "../../webview/chat";
+import { renderChat, renderMarkdown, shouldSend } from "../../webview/chat";
+import { SessionStore } from "../../src/state/session-store";
+import { encodeAttachment } from "../../src/shared/attachment-message";
+
+it("renders user attachment names and metadata without mounting file contents in the DOM", () => {
+  const payload = encodeAttachment(
+    {
+      name: "src/中文.ts",
+      kind: "text",
+      size: 20,
+      reference: "/workspace/src/中文.ts",
+    },
+    "PRIVATE FILE CONTENT",
+  );
+  for (const content of [
+    `帮我分析\n\n${payload}`,
+    [{ type: "text", text: `帮我分析\n\n${payload}` }],
+  ]) {
+    const store = new SessionStore();
+    store.replaceMessages([{ role: "user", content }]);
+    const node = document.createElement("div");
+    renderChat(node, store.getSnapshot());
+    expect(node.textContent).toContain("帮我分析");
+    expect(node.textContent).toContain("src/中文.ts");
+    expect(node.textContent).toContain("20 B");
+    expect(node.innerHTML).not.toContain("PRIVATE FILE CONTENT");
+    expect(node.innerHTML).not.toContain("pi-attachment");
+    expect(
+      node.querySelector<HTMLButtonElement>("[data-reference]")?.dataset
+        .reference,
+    ).toBe("/workspace/src/中文.ts");
+    const reloaded = document.createElement("div");
+    renderChat(reloaded, JSON.parse(JSON.stringify(store.getSnapshot())));
+    expect(reloaded.innerHTML).not.toContain("PRIVATE FILE CONTENT");
+  }
+});
+
+it("keeps assistant text intact and treats attachment names as text", () => {
+  const payload = encodeAttachment(
+    { name: '<img src=x onerror="alert(1)">', kind: "text", size: 4 },
+    "code",
+  );
+  const store = new SessionStore();
+  store.replaceMessages([
+    { role: "user", content: payload },
+    { role: "assistant", content: payload },
+  ]);
+  const node = document.createElement("div");
+  renderChat(node, store.getSnapshot());
+  expect(node.querySelector(".user-message img")).toBeNull();
+  expect(node.querySelector(".user-message")?.textContent).toContain(
+    '<img src=x onerror="alert(1)">',
+  );
+  expect(node.querySelector(".assistant-message")?.textContent).toContain(
+    "code",
+  );
+});
 it("does not send Enter during IME composition or Shift+Enter", () => {
   expect(shouldSend({ key: "Enter", isComposing: true, shiftKey: false })).toBe(
     false,
