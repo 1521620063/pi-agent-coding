@@ -77,7 +77,7 @@ PI 运行时显示暖金色心电图折线，高亮沿波形从左向右循环�
 - 本机已安装并配置 PI，已有可用模型；首次登录和供应商配置需在 PI 自身完成。
 - VS Code 满足扩展声明的 `1.106.0` 或更高版本，当前实测版本为 `1.145.3`。
 - 打开一个本地文件夹，并在 VS Code 中信任该工作区。
-- 使用 JS 入口或脚本启动器时，本机需有能运行该 PI 版本的 Node.js；可通过 `pi.nodePath` 指定。
+- 使用 JS 入口或脚本启动器时，本机需有能运行该 PI 版本的 Node.js。PI 1.5.2 要求 Node.js **≥ 22.19.0**，建议安装 Node.js 24 LTS；项目可继续使用 Node 14 等旧版本，插件会自动查找兼容的已安装版本，也可通过 `pi.nodePath` 指定。
 
 Windows 与 macOS 使用相同的 RPC 桥接；macOS 已验证本地扩展宿主与 PI 1.5.2 的连接。远程、虚拟和未受信任工作区不启动 PI；Linux 尚未实测。
 
@@ -137,7 +137,9 @@ code --install-extension .\pi-agent-coding-1.1.0.vsix
 
 Windows 官方 `.ps1` / `.cmd` 启动器、npm shim 与 macOS npm 符号链接会解析到对应 JS 入口。macOS 官方托管安装器按 `current-version` 读取当前 PI 入口，每次重连重新解析，避免固定到旧版本；插件不执行任意自定义 shell 包装脚本。
 
-自动发现优先使用显式设置，其次使用 VS Code 继承的 `PATH`。缺少 PATH 时，配置的 `pi.nodePath` 所在目录也可用于查找 PI；已找到 PI 时，会在启动器及其符号链接目标所在目录查找 Node.js，然后检查环境变量指定的安装位置和常见目录。支持自定义 `VOLTA_HOME`、npm prefix、Windows `NVM_SYMLINK` 与 POSIX `NVM_BIN`，也检查用户 `.local/bin`、PI 托管目录、Windows 用户 npm 与系统 Node.js / Volta 目录，以及 macOS 的 Apple Silicon / Intel Homebrew 路径；POSIX 另识别 nvm 默认版本与 fnm 默认别名。路径按所在平台规则解析，不依赖固定用户名或盘符；未覆盖的自定义布局仍需手动配置 `pi.executablePath` 和 `pi.nodePath`。发现的 Node 与安装目录会加入本次 PI 子进程的 PATH，不改写系统或 shell 配置。
+自动发现优先使用显式设置，其次使用 VS Code 继承的 `PATH`。缺少 PATH 时，配置的 `pi.nodePath` 所在目录也可用于查找 PI；已找到 PI 时，会在启动器及其符号链接目标所在目录查找 Node.js，然后检查环境变量指定的安装位置和常见目录。支持自定义 `VOLTA_HOME`、npm prefix、Windows `NVM_SYMLINK` 与 POSIX `NVM_BIN`，也检查用户 `.local/bin`、PI 托管目录、Windows 用户 npm 与系统 Node.js / Volta 目录，以及 macOS 的 Apple Silicon / Intel Homebrew 路径；POSIX 另识别 nvm 默认版本与 fnm 默认别名。路径按所在平台规则解析，不依赖固定用户名或盘符。
+
+运行 JS 入口前，插件会检测候选 Node 的版本，跳过低于 PI 1.5.2 运行基线 `22.19.0` 的版本或无法运行的候选，并补查 nvm、Volta、fnm 常见目录中未激活的已安装版本；已通过版本管理器为项目选择 Node 14 时，也可找到其他兼容版本。版本检测使用 PI 将要运行的工作目录，单个候选的版本检测在 3 秒后触发终止；清理命令和等待管道关闭也有单独超时（均为插件限制）。连接取消或资源管理服务销毁时，会取消检测；断开连接会等待检测清理结束。显式配置的 `pi.nodePath` 不合适时直接报错，不自动覆盖用户选择。发现的 Node 与安装目录只加入本次 PI 子进程的 PATH，不改写系统或项目配置。此机制不让 PI 在 Node 14 上运行，也不自动下载 Node；仅安装旧 Node 时，需另行安装兼容版本。未覆盖的自定义安装布局仍需手动配置 `pi.executablePath` 和 `pi.nodePath`。后续 PI 版本可能有更高的运行要求。
 
 Windows 自动发现按大小写不敏感的规则读取环境变量（例如 `ProgramFiles` / `PROGRAMFILES`），并优先使用 `USERPROFILE` 定位用户 PI 目录，避免 Git Bash 的 `HOME` 指向其他位置时漏掉原生安装。除用户 Volta 目录外，也检查 `Program Files\Volta` 中的 Node.js。环境中同时存在 `PATH` / `Path` 时，沿用 Node.js 的 Windows 优先级，向 PI 子进程只传递一个 PATH 变量。
 
@@ -248,7 +250,7 @@ PI 默认注册在右侧辅助侧边栏，可与左侧文件资源管理器同�
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | 找不到 PI                          | 点击提示中的“打开安装说明”安装本机 PI；安装后重启 VS Code 以更新环境变量，或通过“配置 PI 路径”设置 `pi.executablePath` 后重新连接 |
 | 提示启动器无法识别                 | 改用 PI 官方启动器、JS 入口或可执行文件；自定义 shell 包装脚本不会直接执行                                                        |
-| 提示 Node 不存在或启动失败         | 检查 `pi.nodePath`；JS 启动器需要可运行该 PI 版本的本机 Node.js                                                                   |
+| 提示 Node 不存在、不兼容或启动失败 | PI 1.5.2 需要 Node ≥ 22.19.0；安装 Node.js 24 LTS 后重连，插件会自动跳过旧版本；自定义路径可配置 `pi.nodePath`                    |
 | 无工作区、工作区未信任或是远程窗口 | 打开并信任本地文件夹后连接；首版不支持远程宿主                                                                                    |
 | 登录失败、模型不可用               | 在 PI 自身完成登录或模型配置，再重新连接；插件不提供凭证管理                                                                      |
 | 图片发送被阻止                     | 选择 PI 报告支持图片输入的模型，或移除图片；同时检查格式与大小限制                                                                |
@@ -331,3 +333,5 @@ npm run compile
 自动发现回归用例使用临时目录和独立环境变量，覆盖自定义 PI / Node 路径、便携目录、自定义 Volta / npm / nvm 位置及配置优先级；目录生成用例还覆盖多个 Windows 盘符与 POSIX 路径规则。这些模拟用例不等同于在所有操作系统、Node.js 管理器和自定义安装布局上的实机验证。
 
 本轮 Windows 补充实测：在含空格和中文的专用临时目录中，移除继承的 PATH 后自动发现官方 PI 启动器和系统 Volta，完成 PI 1.5.2 版本检测与 `get_state` 握手。独立测试环境清除了上游代理进程携带的 Volta 内部递归标记；关闭扩展、技能与模板发现，使用离线模式且不保存会话，未发送模型请求或修改用户配置。
+
+Node 版本筛选的回归用例模拟了 Node 14 / 16 / 18 / 20 / 22.18 候选、兼容版本回退、未激活的版本管理器安装、显式路径拒绝和检测取消；另验证了检测超时、输出上限、取消与清理竞态、资源管理销毁，以及 Windows 清理命令失败或卡住时的兜底。Windows 已通过单元测试、进程集成测试、构建与 8 项原生 VS Code 扩展宿主用例，并在临时目录自动选中真实 Node 24.22.3，执行真实 PI 1.5.2 的 `--version`。本次未在真实 Node 14 环境或 macOS 重跑，也未调用模型；这些结果不代表 PI 可以直接在 Node 14 上运行。

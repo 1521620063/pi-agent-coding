@@ -15,6 +15,7 @@ import {
 import type { ExtensionUiResponse, PiRecord, RpcCommand } from "./protocol";
 import { modelPresentation } from "./protocol";
 import type { SessionStore } from "../state/session-store";
+import { killTree } from "./process-tree";
 import type { Unsubscribe } from "../shared/bridge";
 interface ControllerConfig extends LaunchConfig {
   requestTimeoutMs?: number;
@@ -33,6 +34,7 @@ export class PiController {
   private diagnostics = "";
   private generation = 0;
   private versionChild?: ChildProcessWithoutNullStreams;
+  private discoveryAbort?: AbortController;
   version?: string;
   constructor(
     private store: SessionStore,
@@ -72,7 +74,18 @@ export class PiController {
         uri: workspaceUri,
         remote: this.config.remote,
       });
-      const launch = await resolvePiLaunch(this.config, { ...process.env });
+      const discovery = new AbortController();
+      this.discoveryAbort = discovery;
+      let launch;
+      try {
+        launch = await resolvePiLaunch(
+          this.config,
+          { ...process.env },
+          { signal: discovery.signal, cwd },
+        );
+      } finally {
+        if (this.discoveryAbort === discovery) this.discoveryAbort = undefined;
+      }
       check();
       this.version = await new Promise<string>((resolve, reject) => {
         const child = spawn(launch.command, [...launch.args, "--version"], {
@@ -216,9 +229,12 @@ export class PiController {
   }
   async disconnect(): Promise<void> {
     ++this.generation;
+    const discovering = this.discoveryAbort ? this.connecting : undefined;
+    this.discoveryAbort?.abort();
     if (this.versionChild) await killTree(this.versionChild);
     this.versionChild = undefined;
     await this.closeProcess();
+    await discovering?.catch(() => {});
     this.store.update({ connection: "disconnected" });
   }
   private closeProcess(updateStatus = true): Promise<void> {
@@ -268,29 +284,5 @@ export class PiController {
       title: undefined,
     });
     this.closing = false;
-  }
-}
-async function killTree(child: {
-  pid?: number;
-  kill(signal?: NodeJS.Signals): boolean;
-}) {
-  if (!child.pid) return;
-  if (process.platform === "win32")
-    await new Promise<void>((resolve) => {
-      const killer = spawn(
-        "taskkill.exe",
-        ["/pid", String(child.pid), "/T", "/F"],
-        { windowsHide: true },
-      );
-      killer.on("error", () => resolve());
-      killer.on("exit", () => resolve());
-    });
-  else {
-    try {
-      // Each PI process owns a separate POSIX group; never signal the editor's group.
-      process.kill(-child.pid, "SIGKILL");
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
-    }
   }
 }

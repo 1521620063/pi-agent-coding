@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import {
   mkdtemp,
   writeFile,
@@ -15,6 +15,17 @@ import {
   assertWorkspace,
   installationDirectories,
 } from "../../src/pi/launcher";
+import { probeNodeVersion } from "../../src/pi/node-runtime";
+
+// Discovery fixtures contain placeholder executables; process probing is covered separately.
+vi.mock("../../src/pi/node-runtime", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../../src/pi/node-runtime")>();
+  return { ...actual, probeNodeVersion: vi.fn() };
+});
+beforeEach(() => {
+  vi.mocked(probeNodeVersion).mockReset().mockResolvedValue("v24.22.3");
+});
 it("finds a PI official launcher in a path containing spaces and Unicode", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pi space 中文 "));
   try {
@@ -31,8 +42,11 @@ it("finds a PI official launcher in a path containing spaces and Unicode", async
       { nodePath: process.execPath },
       { HOME: dir, USERPROFILE: dir, PATH: dir },
     );
-    expect(process.platform === "win32" ? launch.args[0] : launch.command).toBe(
-      join(dir, process.platform === "win32" ? "pi-launcher.js" : "pi"),
+    expect(launch.command).toBe(process.execPath);
+    expect(launch.args[0]).toBe(
+      await realpath(
+        join(dir, process.platform === "win32" ? "pi-launcher.js" : "pi"),
+      ),
     );
     const explicit = await resolvePiLaunch(
       {
@@ -76,7 +90,7 @@ it.skipIf(process.platform === "win32")(
         {},
         { HOME: home, PATH: "/usr/bin:/bin" },
       );
-      expect(launch.command).toBe(join(bin, "pi"));
+      expect(launch.args).toEqual([await realpath(join(bin, "pi"))]);
       expect(launch.env.PATH).toContain(nodeBin);
       expect(launch.env.PATH).toContain(bin);
     } finally {
@@ -249,7 +263,7 @@ it.skipIf(process.platform === "win32")(
       await chmod(join(bin, "pi"), 0o755);
       await chmod(join(bin, "node"), 0o755);
       const launch = await resolvePiLaunch({}, { HOME: home, PATH: "" });
-      expect(launch.command).toBe(join(bin, "pi"));
+      expect(launch.args).toEqual([await realpath(join(bin, "pi"))]);
       expect(launch.env.PATH).toContain(bin);
     } finally {
       await rm(home, { recursive: true, force: true });
@@ -401,6 +415,146 @@ it.each(["darwin", "linux"] as const)(
     expect(directories).not.toContain("/ignored-prefix/bin");
   },
 );
+
+it.each([
+  "v14.21.3",
+  "v16.20.2",
+  "v18.20.8",
+  "v20.19.0",
+  "v22.18.0",
+  "invalid",
+])(
+  "skips incompatible PATH Node %s and selects a compatible fallback",
+  async (version) => {
+    const home = await mkdtemp(join(tmpdir(), "pi old node 中文 "));
+    try {
+      const old = await createInstallation(join(home, "old"));
+      const modern = await createInstallation(join(home, "modern", "bin"));
+      const env = {
+        HOME: home,
+        USERPROFILE: home,
+        PATH: join(home, "old"),
+        VOLTA_HOME: join(home, "modern"),
+      };
+      vi.mocked(probeNodeVersion).mockImplementation(async (path) =>
+        path === old.node ? version : "v24.22.3",
+      );
+      const launch = await resolvePiLaunch({}, env);
+      expect(launch.command).toBe(modern.node);
+      expect(launch.env.PATH?.split(delimiter)[0]).toBe(
+        join(home, "modern", "bin"),
+      );
+      expect(env.PATH).toBe(join(home, "old"));
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  },
+);
+
+it("finds an inactive compatible nvm installation when PATH selects Node 14", async () => {
+  const home = await mkdtemp(join(tmpdir(), "pi inactive nvm 中文 "));
+  try {
+    const old = await createInstallation(join(home, "old"));
+    const root = join(home, "custom-nvm");
+    const modern = await createInstallation(
+      process.platform === "win32"
+        ? join(root, "v24.22.3")
+        : join(root, "versions", "node", "v24.22.3", "bin"),
+    );
+    vi.mocked(probeNodeVersion).mockImplementation(async (path) =>
+      path === old.node ? "v14.21.3" : "v24.22.3",
+    );
+    const launch = await resolvePiLaunch(
+      {},
+      {
+        HOME: home,
+        USERPROFILE: home,
+        PATH: join(home, "old"),
+        [process.platform === "win32" ? "NVM_HOME" : "NVM_DIR"]: root,
+      },
+    );
+    expect(launch.command).toBe(modern.node);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+it("reports the incompatible explicit runtime without overriding it", async () => {
+  const home = await mkdtemp(join(tmpdir(), "pi explicit old node "));
+  try {
+    const old = await createInstallation(join(home, "old"));
+    const modern = await createInstallation(join(home, "modern"));
+    vi.mocked(probeNodeVersion).mockResolvedValue("v14.21.3");
+    await expect(
+      resolvePiLaunch(
+        { executablePath: old.entry, nodePath: old.node },
+        {
+          HOME: home,
+          USERPROFILE: home,
+          PATH: join(home, "modern"),
+        },
+      ),
+    ).rejects.toThrow(/pi.nodePath.*不兼容[\s\S]*22\.19\.0[\s\S]*v14\.21\.3/);
+    expect(probeNodeVersion).toHaveBeenCalledTimes(1);
+    expect(probeNodeVersion).not.toHaveBeenCalledWith(
+      modern.node,
+      expect.anything(),
+      expect.anything(),
+    );
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+it("reports why Node 14 alone cannot launch PI", async () => {
+  const home = await mkdtemp(join(tmpdir(), "pi only old node "));
+  try {
+    const old = await createInstallation(join(home, "old"));
+    vi.mocked(probeNodeVersion).mockResolvedValue("v14.21.3");
+    await expect(
+      resolvePiLaunch(
+        { executablePath: old.entry },
+        {
+          HOME: home,
+          USERPROFILE: home,
+          PATH: join(home, "old"),
+        },
+      ),
+    ).rejects.toThrow(/未找到兼容[\s\S]*22\.19\.0[\s\S]*v14\.21\.3/);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
+
+it("continues after a broken Node candidate and cancels without probing a fallback", async () => {
+  const home = await mkdtemp(join(tmpdir(), "pi probe failure "));
+  try {
+    await createInstallation(join(home, "old"));
+    const modern = await createInstallation(join(home, "modern"));
+    const env = {
+      HOME: home,
+      USERPROFILE: home,
+      PATH: [join(home, "old"), join(home, "modern")].join(delimiter),
+    };
+    vi.mocked(probeNodeVersion).mockRejectedValueOnce(
+      new Error("cannot execute"),
+    );
+    expect((await resolvePiLaunch({}, env)).command).toBe(modern.node);
+    const abort = new AbortController();
+    vi.mocked(probeNodeVersion)
+      .mockReset()
+      .mockImplementation(async () => {
+        abort.abort();
+        throw new Error("cancelled");
+      });
+    await expect(
+      resolvePiLaunch({}, env, { signal: abort.signal }),
+    ).rejects.toThrow();
+    expect(probeNodeVersion).toHaveBeenCalledTimes(1);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});
 
 async function createInstallation(directory: string) {
   await mkdir(directory, { recursive: true });

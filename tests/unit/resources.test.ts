@@ -229,6 +229,38 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
+it("cancels Node discovery when resource management is disposed", async () => {
+  await service.show();
+  let entered!: (signal: AbortSignal) => void;
+  const started = new Promise<AbortSignal>((resolve) => {
+    entered = resolve;
+  });
+  host.launch.mockImplementationOnce(
+    (_config, _env, options: { signal?: AbortSignal }) => {
+      if (!options.signal) {
+        entered(new AbortController().signal);
+        return Promise.reject(
+          new Error("Node discovery has no cancellation signal"),
+        );
+      }
+      entered(options.signal);
+      return new Promise((_resolve, reject) => {
+        options.signal!.addEventListener(
+          "abort",
+          () => reject(new Error("cancelled")),
+          { once: true },
+        );
+      });
+    },
+  );
+  const pending = act("listPackages");
+  const signal = await started;
+  service.dispose();
+  expect(signal.aborted).toBe(true);
+  await pending;
+  expect(host.execute).not.toHaveBeenCalled();
+});
+
 it("lists scopes and project overrides without sending MCP secrets to the webview", async () => {
   await config("user", "mcp.json", {
     mcpServers: {

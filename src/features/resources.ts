@@ -57,6 +57,7 @@ export class ResourceService implements vscode.Disposable {
   private disposed = false;
   private tasks = new Map<vscode.TaskExecution, string>();
   private startingTask = false;
+  private launchAbort?: AbortController;
   private earlyTaskEnds = new Map<vscode.TaskExecution, number | undefined>();
   private refreshAfterTask = false;
   private subscriptions: vscode.Disposable[];
@@ -133,6 +134,7 @@ export class ResourceService implements vscode.Disposable {
   }
   dispose() {
     this.disposed = true;
+    this.launchAbort?.abort();
     for (const subscription of this.subscriptions) subscription.dispose();
     for (const execution of this.tasks.keys()) execution.terminate();
     this.tasks.clear();
@@ -1070,13 +1072,22 @@ export class ResourceService implements vscode.Disposable {
           "PI settings.json 有未保存的编辑，请先保存或撤销，再执行包管理或终端配置。",
         );
     }
-    const launch = await resolvePiLaunch(
-      {
-        executablePath: config.get("executablePath"),
-        nodePath: config.get("nodePath"),
-      },
-      { ...process.env },
-    );
+    this.assertActiveWorkspace();
+    const discovery = new AbortController();
+    this.launchAbort = discovery;
+    let launch;
+    try {
+      launch = await resolvePiLaunch(
+        {
+          executablePath: config.get("executablePath"),
+          nodePath: config.get("nodePath"),
+        },
+        { ...process.env },
+        { cwd: this.workspace, signal: discovery.signal },
+      );
+    } finally {
+      if (this.launchAbort === discovery) this.launchAbort = undefined;
+    }
     if (this.disposed) return;
     this.assertActiveWorkspace();
     const env: Record<string, string> = {};

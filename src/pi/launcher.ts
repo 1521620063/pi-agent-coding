@@ -19,6 +19,12 @@ import {
   win32,
 } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  managedNodeDirectories,
+  minimumPiNodeVersion,
+  probeNodeVersion,
+  supportsPiNode,
+} from "./node-runtime";
 export interface LaunchSpec {
   command: string;
   args: string[];
@@ -197,7 +203,10 @@ async function findIn(directories: string[], names: string[]) {
 export async function resolvePiLaunch(
   config: LaunchConfig,
   sourceEnv: NodeJS.ProcessEnv,
+  options: { signal?: AbortSignal; cwd?: string } = {},
 ): Promise<LaunchSpec> {
+  const { signal } = options;
+  signal?.throwIfAborted();
   const env = { ...sourceEnv };
   const pathKeys = Object.keys(env).filter((key) =>
     process.platform === "win32"
@@ -282,6 +291,19 @@ export async function resolvePiLaunch(
         throw error;
     }
   }
+  if (!entry && process.platform !== "win32") {
+    const firstLine = await header(target);
+    if (/^#!.*\b(?:ba|z|fi|k)?sh\b/.test(firstLine))
+      throw new Error(
+        "无法识别 PI shell 启动器。请将 pi.executablePath 配置为官方 JavaScript 入口或可执行文件。",
+      );
+    if (!(await exists(target, true)))
+      throw new Error(
+        "PI 文件不可执行，请检查安装文件权限或 pi.executablePath。",
+      );
+    // Invoke the selected runtime directly, including for an absolute Node shebang.
+    if (/^#!.*\bnode\b/.test(firstLine)) entry = target;
+  }
   const nodeDirectories = [
     ...new Set([
       ...inherited,
@@ -290,12 +312,44 @@ export async function resolvePiLaunch(
       ...directories,
     ]),
   ];
-  const node =
-    config.nodePath ||
-    (await findIn(
-      nodeDirectories,
-      process.platform === "win32" ? ["node.exe"] : ["node"],
-    ));
+  const nodeNames = process.platform === "win32" ? ["node.exe"] : ["node"];
+  let node: string | undefined;
+  if (entry) {
+    const failures: string[] = [];
+    const candidates = config.nodePath
+      ? [config.nodePath]
+      : [
+          ...new Set([
+            ...nodeDirectories,
+            ...(await managedNodeDirectories(env)),
+          ]),
+        ].map((directory) => join(directory, nodeNames[0]));
+    for (const candidate of candidates) {
+      signal?.throwIfAborted();
+      if (!(await exists(candidate, true))) continue;
+      try {
+        const version = await probeNodeVersion(candidate, env, options);
+        if (supportsPiNode(version)) {
+          node = candidate;
+          break;
+        }
+        if (failures.length < 8)
+          failures.push(
+            `${candidate}（${/^v?\d+\.\d+\.\d+$/.test(version) ? version : "版本输出无效"}）`,
+          );
+      } catch {
+        signal?.throwIfAborted();
+        if (failures.length < 8) failures.push(`${candidate}（版本检测失败）`);
+      }
+    }
+    signal?.throwIfAborted();
+    if (!node)
+      throw new Error(
+        `${config.nodePath ? "pi.nodePath 指定的 Node.js 不兼容或无法运行。" : "未找到兼容的 Node.js。"}PI 1.5.2 的运行要求为 Node.js >= ${minimumPiNodeVersion}。可保留项目的旧版 Node，另行安装 Node.js 24 LTS 后重连；插件会自动查找，也可通过 pi.nodePath 指定。${failures.length ? `\n已检查：\n${failures.join("\n")}` : ""}`,
+      );
+  } else {
+    node = config.nodePath || (await findIn(nodeDirectories, nodeNames));
+  }
   // Include fallback directories for tools started by PI as well as its shebang.
   env[pathKey] = [
     ...new Set([
@@ -304,25 +358,6 @@ export async function resolvePiLaunch(
       ...directories,
     ]),
   ].join(delimiter);
-  if (entry) {
-    if (!node)
-      throw new Error(
-        "已找到 PI，但未找到 Node.js。请安装 Node.js 或在用户设置中配置 pi.nodePath。",
-      );
-    return { command: node, args: [entry], env };
-  }
-  if (process.platform !== "win32") {
-    const firstLine = await header(target);
-    if (/^#!.*\b(?:ba|z|fi|k)?sh\b/.test(firstLine))
-      throw new Error(
-        "无法识别 PI shell 启动器。请将 pi.executablePath 配置为官方 JavaScript 入口或可执行文件。",
-      );
-    if (/^#!.*\bnode\b/.test(firstLine) && !node)
-      throw new Error("已找到 PI，但未找到 Node.js。请配置 pi.nodePath。");
-    if (!(await exists(target, true)))
-      throw new Error(
-        "PI 文件不可执行，请检查安装文件权限或 pi.executablePath。",
-      );
-  }
+  if (entry) return { command: node!, args: [entry], env };
   return { command: executable, args: [], env };
 }
